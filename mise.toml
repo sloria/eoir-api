@@ -1,0 +1,44 @@
+[tools]
+uv = "latest"
+prek = "latest"
+
+[env]
+_.file = '.env'
+LITESTAR_APP = "eoir_api.asgi:app"
+
+[tasks.setup]
+description = "Set up the development environment"
+run = """
+test -f .env || cp .env.example .env
+uv sync --all-groups
+uv run patchright install chrome
+prek install -f
+"""
+
+[tasks.lint]
+description = "Lint the codebase"
+run = "prek run --all-files"
+
+[tasks.typecheck]
+description = "Run type checks"
+run = "uv run ty check"
+
+[tasks.test]
+description = "Run tests (excludes live browser tests)"
+run = "uv run pytest"
+
+[tasks."test:live"]
+description = "Run live browser tests against the real ACIS site"
+run = "uv run pytest -m live"
+
+[tasks.serve]
+description = "Run the app server in development mode"
+run = "DEBUG=true uv run litestar run --reload --port 8001 --host 127.0.0.1 --debug"
+
+[tasks.start]
+description = "Run the production server"
+run = "uv run --frozen litestar run --host {{env.HOST | default(value='127.0.0.1')}} --port {{env.PORT | default(value='8001')}}"
+
+[tasks."refresh-reference"]
+description = "Re-fetch nationality codes and decision types from ACIS"
+run = "uv run python scripts/refresh_reference_data.py"

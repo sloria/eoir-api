@@ -1,0 +1,93 @@
+[project]
+name = "eoir-api"
+version = "26.0.0"
+description = "Unofficial API for EOIR Automated Case Information"
+readme = "README.md"
+authors = [{ name = "Steven Loria", email = "git@stevenloria.com" }]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.14"
+dependencies = [
+    "dataclass-settings>=0.5.0",
+    "litestar[standard,structlog]>=2.14.0",
+    "patchright>=1.61.2",
+    "sentry-sdk[litestar]>=2.42.1",
+    "structlog>=25.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.1.0",
+    "pytest>=8.3.4",
+    "ruff>=0.11.6",
+    "syrupy>=4.8.1",
+    "time-machine>=2.16.0",
+    "ty>=0.0.20",
+]
+
+[build-system]
+requires = ["flit_core<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.uv]
+default-groups = ["dev"]
+exclude-newer = "1 week"
+
+[tool.ruff]
+fix = true
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+# use all checks available in ruff except the ones explicitly ignored below
+select = ["ALL"]
+ignore = [
+    "A002",    # allow using `id` as a variable name
+    "ANN",     # let ty handle annotation checks
+    "ARG",     # unused arguments are common w/ interfaces
+    "COM",     # let formatter take care commas
+    "CPY",     # don't require copyright notices
+    "C901",    # don't enforce complexity level
+    "D",       # don't require docstrings
+    "DTZ007",  # ignore false positives due to https://github.com/astral-sh/ruff/issues/1306
+    "E501",    # leave line-length enforcement to formatter
+    "EM",      # allow string messages in exceptions
+    "ERA001",  # allow commenting out code
+    "FIX",     # allow "FIX" comments in code
+    "G004",    # allow f-strings in logging
+    "INP001",  # allow Python files outside of packages
+    "N806",    # allow uppercase variable names for variables that are classes
+    "PERF203", # allow try-except within loops
+    "PLR0913", # "Too many arguments"
+    "PLR0911", # "Too many statements"
+    "PLR0912", # "Too many branches"
+    "PLR2004", # "Magic value used in comparison"
+    "PTH",     # don't require using pathlib instead of os
+    "RUF012",  # allow mutable class variables
+    "S311",    # allow `random` module usages
+    "S603",    # allow subprocess calls
+    "SIM102",  # Sometimes nested ifs are more readable than if...and...
+    "SIM105",  # "Use `contextlib.suppress(...)` instead of `try`-`except`-`pass`"
+    "SIM108",  # sometimes if-else is more readable than a ternary
+    "T201",    # allow print
+    "TC001",   # don't require TYPE_CHECKING checks for imports (needed for litestar DI)
+    "TC002",   # ditto for third-party imports (e.g. litestar.params.FromPath)
+    "TD",      # allow TODO comments to be whatever we want
+    "TRY003",  # allow long messages passed to exceptions
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "ARG",     # unused arguments are fine in tests
+    "PLR0915", # allow lots of statements
+    "PT007",   # ignore false positives due to https://github.com/astral-sh/ruff/issues/14743
+    "PT011",   # don't require match when using pytest.raises
+    "S",       # allow asserts
+    "SIM117",  # allow nested with statements because it's more readable sometimes
+    "SLF001",  # allow private attribute access
+]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not live'"
+markers = ["live: hits the real ACIS site with a real browser"]
