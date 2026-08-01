@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Self
@@ -19,7 +20,7 @@ from eoir_api.exceptions import (
     CaseUnavailableError,
     UpstreamError,
 )
-from eoir_api.nationalities import get_by_code
+from eoir_api.nationalities import Nationality, get_by_code
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -53,6 +54,13 @@ TYPE_DELAY = 70
 CAPTCHA_ERROR_FRAGMENT = "Invalid Captcha Provided"
 NOT_FOUND_FRAGMENTS = ("No case info found", "Invalid nationality code")
 UNAVAILABLE_FRAGMENT = "Case information is unavailable"
+
+
+def option_label(nationality: Nationality) -> re.Pattern[str]:
+    return re.compile(
+        rf"^{re.escape(f'{nationality.name} ({nationality.code})')}$", re.IGNORECASE
+    )
+
 
 ##### Browser #####
 
@@ -237,10 +245,11 @@ class AcisBrowser:
         await page.locator(DIGIT_INPUT_SELECTOR).first.click()
         await page.keyboard.type(a_number, delay=TYPE_DELAY)
 
+        nationality = get_by_code(nat_code)
         await page.locator(NATIONALITY_INPUT_SELECTOR).click()
-        await page.keyboard.type(get_by_code(nat_code).name, delay=TYPE_DELAY)
-        await self._wait_for(page, NATIONALITY_OPTION_SELECTOR, "nationality options")
-        await page.keyboard.press("Enter")
+        await page.keyboard.type(nationality.name, delay=TYPE_DELAY)
+        option = page.get_by_role("option", name=option_label(nationality))
+        await option.first.click(timeout=5000)
         await self._wait_for(
             page,
             NATIONALITY_OPTION_SELECTOR,

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -11,7 +12,13 @@ from eoir_api.exceptions import (
     CaseUnavailableError,
     UpstreamError,
 )
-from eoir_api.lib.acis import AcisBrowser, _Capture
+from eoir_api.lib.acis import AcisBrowser, _Capture, option_label
+from eoir_api.nationalities import resolve
+
+if TYPE_CHECKING:
+    import re
+
+    from patchright.async_api import Page
 
 pytestmark = pytest.mark.anyio
 
@@ -20,6 +27,71 @@ def responded(payload: Any, *, status: int = 200) -> _Capture:
     capture = _Capture(requested=True, status=status, body=json.dumps(payload))
     capture.received.set()
     return capture
+
+
+##### Form filling #####
+
+
+@dataclass
+class FakeLocator:
+    clicked: bool = False
+
+    @property
+    def first(self) -> FakeLocator:
+        return self
+
+    async def click(self, **_kwargs: Any) -> None:
+        self.clicked = True
+
+
+@dataclass
+class FakeKeyboard:
+    typed: list[str] = field(default_factory=list)
+    pressed: list[str] = field(default_factory=list)
+
+    async def type(self, text: str, **_kwargs: Any) -> None:
+        self.typed.append(text)
+
+    async def press(self, key: str, **_kwargs: Any) -> None:
+        self.pressed.append(key)
+
+
+@dataclass
+class FakePage:
+    keyboard: FakeKeyboard = field(default_factory=FakeKeyboard)
+    roles: list[tuple[str, re.Pattern[str]]] = field(default_factory=list)
+    option: FakeLocator = field(default_factory=FakeLocator)
+
+    def locator(self, _selector: str) -> FakeLocator:
+        return FakeLocator()
+
+    def get_by_role(self, role: str, *, name: re.Pattern[str]) -> FakeLocator:
+        self.roles.append((role, name))
+        return self.option
+
+    async def wait_for_selector(self, *_args: Any, **_kwargs: Any) -> None:
+        return
+
+
+async def test_nationality_is_chosen_by_exact_option_not_the_highlighted_one(settings):
+    page = FakePage()
+
+    await AcisBrowser(settings)._fill_form(cast("Page", page), "245494576", "GV")
+
+    assert page.keyboard.typed == ["245494576", "GUINEA"]
+    # Enter would take "EQUATORIAL GUINEA", the first substring match.
+    assert page.keyboard.pressed == []
+    assert page.option.clicked
+    [(role, pattern)] = page.roles
+    assert role == "option"
+    assert pattern.match("GUINEA (GV)")
+    assert not pattern.match("EQUATORIAL GUINEA (EK)")
+    assert not pattern.match("GUINEA BISSAU (PU)")
+
+
+# Matching the bare name finds no option at all.
+def test_option_label_includes_the_code():
+    assert option_label(resolve("Guinea")).pattern == r"^GUINEA\ \(GV\)$"
 
 
 ##### Failure classification #####

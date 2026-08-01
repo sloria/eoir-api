@@ -102,4 +102,4 @@ License, version 3 or later. See [LICENSE](LICENSE).
 
 Run this privately however you like (including commercially). If you
 modify it and let other people reach it over a network, you'll need
-to provide users your modified source code.
+to disclose your changes. Please contribute patches back!
