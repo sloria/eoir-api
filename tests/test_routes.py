@@ -12,7 +12,7 @@ from eoir_api.exceptions import (
 pytestmark = pytest.mark.anyio
 
 A_NUMBER = "999999999"
-HEADERS = {"x-key": "test-secret"}
+HEADERS = {"x-api-key": "test-secret"}
 
 
 ##### Health #####
@@ -40,7 +40,7 @@ async def test_missing_secret_is_rejected(client):
 
 async def test_wrong_secret_is_rejected(client):
     response = await client.get(
-        f"/cases/{A_NUMBER}?nationality=VE", headers={"x-key": "nope"}
+        f"/cases/{A_NUMBER}?nationality=VE", headers={"x-api-key": "nope"}
     )
     assert response.status_code == 401
 

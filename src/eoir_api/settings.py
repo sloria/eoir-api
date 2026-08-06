@@ -18,7 +18,7 @@ class Settings:
     debug: Annotated[bool, Env("DEBUG")] = False
 
     api_secret: Annotated[str, Env("API_SECRET")]
-    """Secret required in the ``x-key`` header."""
+    """Secret required in the ``x-api-key`` header."""
 
     # Browser
     chrome_profile_dir: Annotated[Path, Env("CHROME_PROFILE_DIR")] = DEFAULT_PROFILE_DIR

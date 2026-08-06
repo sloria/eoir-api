@@ -20,11 +20,11 @@ async def test_healthcheck_not_documented(client):
     assert "/healthz" not in spec["paths"]
 
 
-async def test_x_key_security_scheme_is_declared(client):
+async def test_api_key_security_scheme_is_declared(client):
     spec = (await client.get("/schema/openapi.json")).json()
     scheme = spec["components"]["securitySchemes"]["apiKey"]
     assert scheme["type"] == "apiKey"
-    assert scheme["name"] == "x-key"
+    assert scheme["name"] == "x-api-key"
     assert scheme["in"] == "header"
     assert spec["security"] == [{"apiKey": []}]
 

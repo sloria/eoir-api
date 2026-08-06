@@ -84,7 +84,7 @@ def create_openapi_config() -> OpenAPIConfig:
             security_schemes={
                 "apiKey": SecurityScheme(
                     type="apiKey",
-                    name="x-key",
+                    name="x-api-key",
                     security_scheme_in="header",
                 )
             }
