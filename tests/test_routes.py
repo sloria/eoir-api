@@ -130,7 +130,7 @@ async def test_captcha_exhausted_returns_503(client, browser):
     )
     response = await client.get(f"/cases/{A_NUMBER}?nationality=VE", headers=HEADERS)
     assert response.status_code == 503
-    assert "Retry-After" in response.headers
+    assert response.headers["Retry-After"] == "300"
 
 
 async def test_upstream_error_returns_502(client, browser):

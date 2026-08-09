@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 import structlog
-from litestar import Response, get
+from litestar import Request, Response, get
 from litestar.di import NamedDependency
 from litestar.exceptions import (
     ClientException,
@@ -12,6 +12,7 @@ from litestar.exceptions import (
     ServiceUnavailableException,
     TooManyRequestsException,
 )
+from litestar.exceptions.responses import create_exception_response
 from litestar.params import FromPath, QueryParameter
 from litestar.status_codes import (
     HTTP_422_UNPROCESSABLE_ENTITY,
@@ -65,6 +66,7 @@ def health() -> Response:
 )
 async def get_case(
     *,
+    request: Request,
     a_number: FromPath[str],
     service: NamedDependency[CaseService],
     nationality: Annotated[
@@ -77,7 +79,7 @@ async def get_case(
         bool,
         QueryParameter(description="Bypass the cache and force a fresh lookup."),
     ] = False,
-) -> CaseResponse:
+) -> Response[CaseResponse]:
     """Look up current case information for an A-Number and nationality."""
     try:
         cleaned = normalize_a_number(a_number)
@@ -91,7 +93,7 @@ async def get_case(
 
     log = logger.bind(a_number=redact(cleaned), nat_code=resolved.code)
     try:
-        return await service.get_case(cleaned, resolved, refresh=refresh)
+        return Response(await service.get_case(cleaned, resolved, refresh=refresh))
     except CaseNotFoundError as exc:
         log.info("case.not_found")
         raise NotFoundException(
@@ -106,13 +108,16 @@ async def get_case(
         raise TooManyRequestsException(
             str(exc), headers={"Retry-After": str(retry_after)}
         ) from exc
-    except CaptchaError as exc:
-        log.warning("case.captcha_exhausted")
+    except CaptchaError as exc:  # These errors are expected, so don't re-raise
+        log.warning("case.captcha_error", reason=exc.reason)
         retry_after = 300
-        raise ServiceUnavailableException(
-            "Could not obtain a captcha token after several attempts. Try again.",
-            headers={"Retry-After": str(retry_after)},
-        ) from exc
+        return create_exception_response(
+            request,
+            ServiceUnavailableException(
+                "Could not obtain a captcha token after several attempts. Try again.",
+                headers={"Retry-After": str(retry_after)},
+            ),
+        )
     except UpstreamError as exc:
         log.warning("case.upstream_error", error=str(exc))
         raise BadGatewayException(f"Upstream error: {exc}") from exc
