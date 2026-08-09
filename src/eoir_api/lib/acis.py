@@ -173,7 +173,7 @@ class AcisBrowser:
                 self._last_used = time.monotonic()
 
     async def _lookup_once(self, a_number: str, nat_code: str) -> dict[str, Any]:
-        """Drive the form and return the parsed backend response."""
+        """Fill the form and return the parsed backend response."""
         if self._context is None:  # pragma: no cover
             raise UpstreamError("Browser is not running")
         page = await self._context.new_page()
@@ -293,5 +293,5 @@ class AcisBrowser:
         if status != 200:
             raise UpstreamError(f"ACIS returned HTTP {status}")
         if not isinstance(payload, dict):
-            raise UpstreamError("ACIS returned an unexpected payload shape")
+            raise UpstreamError("ACIS returned an unexpected payload")
         return payload

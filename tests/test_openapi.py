@@ -32,9 +32,9 @@ async def test_api_key_security_scheme_is_declared(client):
 async def test_case_lookup_documents_success_and_actionable_errors(client):
     spec = (await client.get("/schema/openapi.json")).json()
     responses = spec["paths"]["/cases/{a_number}"]["get"]["responses"]
-    assert {"200", "404", "422", "429"} <= set(responses)
+    assert {"200", "404", "422", "429", "503"} <= set(responses)
     assert "401" not in responses
-    assert "503" not in responses
+    assert "502" not in responses
 
 
 async def test_docs_ui_is_served_at_schema_root(client):
