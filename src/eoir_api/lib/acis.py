@@ -6,6 +6,7 @@ import json
 import re
 import time
 from dataclasses import dataclass, field
+from enum import StrEnum, auto
 from typing import TYPE_CHECKING, Any, Literal, Self
 
 import anyio
@@ -14,15 +15,8 @@ from patchright.async_api import Error as PlaywrightError
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 from patchright.async_api import async_playwright
 
-from eoir_api.exceptions import (
-    CaptchaError,
-    CaseNotFoundError,
-    CaseUnavailableError,
-    UpstreamError,
-)
-from eoir_api.nationalities import Nationality, get_by_code
-
 if TYPE_CHECKING:
+    from pathlib import Path
     from types import TracebackType
 
     from patchright.async_api import (
@@ -33,33 +27,48 @@ if TYPE_CHECKING:
         Response,
     )
 
-    from eoir_api.settings import Settings
-
 logger = structlog.get_logger()
 
 ACIS_URL = "https://acis.eoir.justice.gov/en/"
-CASE_INFO_PATH = "/api/Case/GetCaseInfo"
-WAIT_UNTIL = "domcontentloaded"
-
-MODAL_OVERLAY_SELECTOR = ".ReactModal__Overlay"
-MODAL_BUTTON_SELECTOR = ".ReactModalPortal button"
-DIGIT_INPUT_SELECTOR = 'input[inputmode="numeric"]'
-NATIONALITY_INPUT_SELECTOR = "#react-select-3-input"
-NATIONALITY_OPTION_SELECTOR = '[role="option"]'
-APP_READY_SELECTOR = f"{MODAL_OVERLAY_SELECTOR}, {DIGIT_INPUT_SELECTOR}"
-
-SUBMIT_SELECTOR = "#btn_submit"
-TYPE_DELAY = 70
-
-CAPTCHA_ERROR_FRAGMENT = "Invalid Captcha Provided"
-NOT_FOUND_FRAGMENTS = ("No case info found", "Invalid nationality code")
-UNAVAILABLE_FRAGMENT = "Case information is unavailable"
 
 
-def option_label(nationality: Nationality) -> re.Pattern[str]:
-    return re.compile(
-        rf"^{re.escape(f'{nationality.name} ({nationality.code})')}$", re.IGNORECASE
-    )
+def option_label(nat_name: str, nat_code: str) -> re.Pattern[str]:
+    return re.compile(rf"^{re.escape(f'{nat_name} ({nat_code})')}$", re.IGNORECASE)
+
+
+##### Errors #####
+
+
+class AcisError(Exception):
+    """Base class for failures talking to ACIS."""
+
+
+class CaptchaError(AcisError):
+    """Raised when an hCaptcha token can't be obtained or the token is refused."""
+
+    class Reason(StrEnum):
+        NO_REQUEST = auto()
+        """Form was submitted but no case request followed."""
+        NO_RESPONSE = auto()
+        """Case request went out but nothing came back."""
+        REJECTED = auto()
+        """Token was submitted and rejected."""
+
+    def __init__(self, message: str, *, reason: Reason) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+class CaseNotFoundError(AcisError):
+    """Raised when ACIS has no case for a given A-Number and nationality."""
+
+
+class CaseUnavailableError(AcisError):
+    """Raised when the case exists but ACIS won't release information for it."""
+
+
+class UpstreamError(AcisError):
+    """Raised when ACIS returns an unexpected response."""
 
 
 ##### Browser #####
@@ -73,14 +82,23 @@ class _Capture:
     received: anyio.Event = field(default_factory=anyio.Event)
 
 
+@dataclass(kw_only=True)
 class AcisBrowser:
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
-        # Lock to ensure only one lookup at a time
-        self._lock = anyio.Lock()
-        self._playwright: Playwright | None = None
-        self._context: BrowserContext | None = None
-        self._last_used: float = 0.0
+    """``profile_dir`` must be persistent: it accumulates hCaptcha standing.
+
+    ``lookup_timeout`` and ``idle_timeout`` are in seconds.
+    """
+
+    profile_dir: Path
+    lookup_timeout: float = 20
+    lookup_attempts: int = 2
+    idle_timeout: float = 900
+
+    # Lock to ensure only one lookup at a time
+    _lock: anyio.Lock = field(default_factory=anyio.Lock, init=False, repr=False)
+    _playwright: Playwright | None = field(default=None, init=False, repr=False)
+    _context: BrowserContext | None = field(default=None, init=False, repr=False)
+    _last_used: float = field(default=0.0, init=False, repr=False)
 
     ##### Lifecycle #####
 
@@ -88,12 +106,11 @@ class AcisBrowser:
         """Launch Chrome. Safe to call repeatedly."""
         if self._context is not None:
             return
-        settings = self._settings
-        settings.chrome_profile_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("browser starting", profile=str(settings.chrome_profile_dir))
+        self.profile_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("browser starting", profile=str(self.profile_dir))
         self._playwright = await async_playwright().start()
         self._context = await self._playwright.chromium.launch_persistent_context(
-            str(settings.chrome_profile_dir),
+            str(self.profile_dir),
             channel="chrome",
             headless=False,
             no_viewport=True,
@@ -117,13 +134,13 @@ class AcisBrowser:
         if self._context is None:
             return False
         idle = time.monotonic() - self._last_used
-        if idle < self._settings.browser_idle_timeout:
+        if idle < self.idle_timeout:
             return False
         async with self._lock:
             # Re-check under the lock: a lookup may have started meanwhile.
             if self._context is None:
                 return False
-            if time.monotonic() - self._last_used < self._settings.browser_idle_timeout:
+            if time.monotonic() - self._last_used < self.idle_timeout:
                 return False
             logger.info("browser idle, closing", idle_seconds=round(idle))
             await self.close()
@@ -143,9 +160,15 @@ class AcisBrowser:
 
     ##### Lookup #####
 
-    async def lookup(self, a_number: str, nat_code: str) -> dict[str, Any]:
-        """Return the raw ACIS JSON payload for a case. Retries transient captcha failures."""
-        attempts = self._settings.lookup_attempts
+    async def lookup(
+        self, a_number: str, nat_code: str, nat_name: str
+    ) -> dict[str, Any]:
+        """Return the raw ACIS JSON payload for a case. Retries transient captcha failures.
+
+        The form takes the nationality *name*; the code only disambiguates the
+        option label, since names are substrings of one another.
+        """
+        attempts = self.lookup_attempts
         async with self._lock:
             await self.start()
             self._last_used = time.monotonic()
@@ -154,7 +177,7 @@ class AcisBrowser:
                 while True:
                     attempt += 1
                     try:
-                        payload = await self._lookup_once(a_number, nat_code)
+                        payload = await self._lookup_once(a_number, nat_code, nat_name)
                     except CaptchaError as exc:
                         logger.warning(
                             "lookup.captcha_failed",
@@ -172,19 +195,22 @@ class AcisBrowser:
             finally:
                 self._last_used = time.monotonic()
 
-    async def _lookup_once(self, a_number: str, nat_code: str) -> dict[str, Any]:
+    async def _lookup_once(
+        self, a_number: str, nat_code: str, nat_name: str
+    ) -> dict[str, Any]:
         """Fill the form and return the parsed backend response."""
         if self._context is None:  # pragma: no cover
             raise UpstreamError("Browser is not running")
         page = await self._context.new_page()
         captured = _Capture()
+        case_info_path = "/api/Case/GetCaseInfo"
 
         async def on_request(request: Request) -> None:
-            if CASE_INFO_PATH in request.url:
+            if case_info_path in request.url:
                 captured.requested = True
 
         async def on_response(response: Response) -> None:
-            if CASE_INFO_PATH not in response.url:
+            if case_info_path not in response.url:
                 return
             captured.status = response.status
             try:
@@ -198,12 +224,17 @@ class AcisBrowser:
         page.on("response", on_response)
 
         try:
-            await page.goto(ACIS_URL, wait_until=WAIT_UNTIL, timeout=60_000)
-            await self._wait_for(page, APP_READY_SELECTOR, "app", timeout_ms=30_000)
+            await page.goto(ACIS_URL, wait_until="domcontentloaded", timeout=60_000)
+            await self._wait_for(
+                page,
+                '.ReactModal__Overlay, input[inputmode="numeric"]',
+                "app",
+                timeout_ms=30_000,
+            )
             await self._dismiss_modal(page)
-            await self._fill_form(page, a_number, nat_code)
-            await page.locator(SUBMIT_SELECTOR).click()
-            with anyio.move_on_after(self._settings.lookup_timeout):
+            await self._fill_form(page, a_number, nat_code, nat_name)
+            await page.locator("#btn_submit").click()
+            with anyio.move_on_after(self.lookup_timeout):
                 await captured.received.wait()
         except PlaywrightError as exc:
             raise UpstreamError("Could not lookup case") from exc
@@ -233,28 +264,27 @@ class AcisBrowser:
 
     async def _dismiss_modal(self, page: Page) -> None:
         try:
-            await page.wait_for_selector(MODAL_OVERLAY_SELECTOR, timeout=500)
+            await page.wait_for_selector(".ReactModal__Overlay", timeout=500)
         except PlaywrightTimeoutError:
             return
-        await page.locator(MODAL_BUTTON_SELECTOR).last.click()
+        await page.locator(".ReactModalPortal button").last.click()
         await self._wait_for(
-            page, MODAL_OVERLAY_SELECTOR, "consent modal to close", state="detached"
+            page, ".ReactModal__Overlay", "consent modal to close", state="detached"
         )
 
-    async def _fill_form(self, page: Page, a_number: str, nat_code: str) -> None:
-        await page.locator(DIGIT_INPUT_SELECTOR).first.click()
-        await page.keyboard.type(a_number, delay=TYPE_DELAY)
+    async def _fill_form(
+        self, page: Page, a_number: str, nat_code: str, nat_name: str
+    ) -> None:
+        type_delay = 70  # milliseconds
+        await page.locator('input[inputmode="numeric"]').first.click()
+        await page.keyboard.type(a_number, delay=type_delay)
 
-        nationality = get_by_code(nat_code)
-        await page.locator(NATIONALITY_INPUT_SELECTOR).click()
-        await page.keyboard.type(nationality.name, delay=TYPE_DELAY)
-        option = page.get_by_role("option", name=option_label(nationality))
+        await page.locator("#react-select-3-input").click()
+        await page.keyboard.type(nat_name, delay=type_delay)
+        option = page.get_by_role("option", name=option_label(nat_name, nat_code))
         await option.first.click(timeout=5000)
         await self._wait_for(
-            page,
-            NATIONALITY_OPTION_SELECTOR,
-            "nationality menu to close",
-            state="detached",
+            page, '[role="option"]', "nationality menu to close", state="detached"
         )
 
     def _parse(self, captured: _Capture) -> dict[str, Any]:
@@ -266,8 +296,7 @@ class AcisBrowser:
                     reason=CaptchaError.Reason.NO_REQUEST,
                 )
             raise CaptchaError(
-                "No response to the case request within "
-                f"{self._settings.lookup_timeout}s",
+                f"No response to the case request within {self.lookup_timeout}s",
                 reason=CaptchaError.Reason.NO_RESPONSE,
             )
         if captured.body is None:
@@ -282,11 +311,12 @@ class AcisBrowser:
 
         message = payload.get("message") if isinstance(payload, dict) else None
         if message:
-            if CAPTCHA_ERROR_FRAGMENT in message:
+            if "Invalid Captcha Provided" in message:
                 raise CaptchaError(message, reason=CaptchaError.Reason.REJECTED)
-            if UNAVAILABLE_FRAGMENT in message:
+            if "Case information is unavailable" in message:
                 raise CaseUnavailableError(message)
-            if any(fragment in message for fragment in NOT_FOUND_FRAGMENTS):
+            not_found = ("No case info found", "Invalid nationality code")
+            if any(fragment in message for fragment in not_found):
                 raise CaseNotFoundError(message)
             raise UpstreamError(message)
 

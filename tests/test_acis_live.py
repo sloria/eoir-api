@@ -6,10 +6,8 @@ import os
 
 import pytest
 
-from eoir_api.exceptions import CaseNotFoundError
-from eoir_api.lib.acis import AcisBrowser
+from eoir_api.lib.acis import AcisBrowser, CaseNotFoundError
 from eoir_api.nationalities import resolve
-from eoir_api.settings import Settings
 
 pytestmark = [pytest.mark.anyio, pytest.mark.live]
 
@@ -52,24 +50,26 @@ REQUIRED_KEYS = {
 
 
 @pytest.fixture
-def live_settings(tmp_path) -> Settings:
-    return Settings(api_secret="live-test", chrome_profile_dir=tmp_path / "profile")
+def live_browser(tmp_path) -> AcisBrowser:
+    return AcisBrowser(profile_dir=tmp_path / "profile")
 
 
-async def test_captcha_token_is_accepted(live_settings):
-    async with AcisBrowser(live_settings) as browser:
+async def test_captcha_token_is_accepted(live_browser):
+    async with live_browser as browser:
         with pytest.raises(CaseNotFoundError):
-            await browser.lookup("123456789", "MX")
+            await browser.lookup("123456789", "MX", "MEXICO")
 
 
 @pytest.mark.skipif(
     not (TEST_A_NUMBER and TEST_NATIONALITY),
     reason="set EOIR_TEST_A_NUMBER and EOIR_TEST_NATIONALITY",
 )
-async def test_payload_shape_is_unchanged(live_settings):
+async def test_payload_shape_is_unchanged(live_browser):
     nationality = resolve(TEST_NATIONALITY)
-    async with AcisBrowser(live_settings) as browser:
-        payload = await browser.lookup(TEST_A_NUMBER, nationality.code)
+    async with live_browser as browser:
+        payload = await browser.lookup(
+            TEST_A_NUMBER, nationality.code, nationality.name
+        )
 
     # Presence, not truthiness: most of these are null for any given case.
     for section, keys in REQUIRED_KEYS.items():

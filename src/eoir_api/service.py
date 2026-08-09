@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import datetime as dt  # noqa: TC003
 import time
-from typing import TYPE_CHECKING, Any, Protocol
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 
 import msgspec
 import structlog
@@ -12,9 +13,7 @@ import structlog
 from eoir_api.exceptions import QueueTimeoutError
 from eoir_api.lib.cache import TTLCache
 from eoir_api.nationalities import Nationality
-
-if TYPE_CHECKING:
-    from eoir_api.settings import Settings
+from eoir_api.settings import Settings
 
 logger = structlog.get_logger()
 
@@ -23,7 +22,9 @@ _EWMA_ALPHA = 0.3
 
 
 class SupportsLookup(Protocol):
-    async def lookup(self, a_number: str, nat_code: str) -> dict[str, Any]: ...
+    async def lookup(
+        self, a_number: str, nat_code: str, nat_name: str
+    ) -> dict[str, Any]: ...
 
 
 class Case(msgspec.Struct):
@@ -34,13 +35,19 @@ class Case(msgspec.Struct):
     acis: dict[str, Any]
 
 
+@dataclass
 class CaseService:
-    def __init__(self, browser: SupportsLookup, settings: Settings) -> None:
-        self._browser = browser
-        self._settings = settings
-        self._cache: TTLCache[dict[str, Any]] = TTLCache(ttl=settings.cache_ttl)
-        self._pending = 0
-        self.avg_lookup_seconds = 10.0
+    browser: SupportsLookup
+    settings: Settings
+
+    avg_lookup_seconds: float = field(default=10.0, init=False)
+    _pending: int = field(default=0, init=False)
+
+    def __post_init__(self) -> None:
+        # Not a dataclass field: msgspec resolves field annotations when Litestar
+        # builds the signature model, and it cannot evaluate TTLCache's PEP 695 type
+        # parameter.
+        self._cache: TTLCache[dict[str, Any]] = TTLCache(ttl=self.settings.cache_ttl)
 
     @property
     def pending(self) -> int:
@@ -71,17 +78,19 @@ class CaseService:
                     acis=entry.value,
                 )
 
-        if self.estimated_wait > self._settings.max_queue_wait:
+        if self.estimated_wait > self.settings.max_queue_wait:
             raise QueueTimeoutError(
                 f"Estimated wait {self.estimated_wait:.0f}s exceeds "
-                f"{self._settings.max_queue_wait}s; retry shortly"
+                f"{self.settings.max_queue_wait}s; retry shortly"
             )
 
         self._pending += 1
         started = time.monotonic()
         logger.info("lookup.start", nat_code=nationality.code, pending=self._pending)
         try:
-            payload = await self._browser.lookup(a_number, nationality.code)
+            payload = await self.browser.lookup(
+                a_number, nationality.code, nationality.name
+            )
         except Exception as exc:
             logger.warning(
                 "lookup.failed", nat_code=nationality.code, error=type(exc).__name__
