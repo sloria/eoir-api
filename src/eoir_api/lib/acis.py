@@ -84,10 +84,7 @@ class _Capture:
 
 @dataclass(kw_only=True)
 class AcisBrowser:
-    """``profile_dir`` must be persistent: it accumulates hCaptcha standing.
-
-    ``lookup_timeout`` and ``idle_timeout`` are in seconds.
-    """
+    """A Playwright/Patchright wrapper to do ACIS lookups."""
 
     profile_dir: Path
     lookup_timeout: float = 20

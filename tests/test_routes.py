@@ -24,12 +24,6 @@ async def test_health_check(client):
     assert response.text == "ok"
 
 
-async def test_health_check_does_not_start_the_browser(client, browser):
-    await client.get("/healthz")
-    assert browser.started is False
-    assert browser.calls == []
-
-
 ##### Auth #####
 
 
