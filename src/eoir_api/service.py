@@ -26,7 +26,7 @@ class SupportsLookup(Protocol):
     async def lookup(self, a_number: str, nat_code: str) -> dict[str, Any]: ...
 
 
-class CaseResponse(msgspec.Struct):
+class Case(msgspec.Struct):
     a_number: str
     nationality: Nationality
     retrieved_at: dt.datetime
@@ -53,8 +53,8 @@ class CaseService:
 
     async def get_case(
         self, a_number: str, nationality: Nationality, *, refresh: bool = False
-    ) -> CaseResponse:
-        """Return the API response body for a case.
+    ) -> Case:
+        """Return the case for an A-Number and nationality.
 
         Raises ``QueueTimeoutError`` if the request would wait too long.
         """
@@ -63,7 +63,7 @@ class CaseService:
             entry = self._cache.get(key)
             if entry is not None:
                 logger.debug("lookup.cache_hit", nat_code=nationality.code)
-                return CaseResponse(
+                return Case(
                     a_number=a_number,
                     nationality=nationality,
                     retrieved_at=entry.stored_at,
@@ -100,7 +100,7 @@ class CaseService:
             nat_code=nationality.code,
             duration=round(duration, 1),
         )
-        return CaseResponse(
+        return Case(
             a_number=a_number,
             nationality=nationality,
             retrieved_at=entry.stored_at,

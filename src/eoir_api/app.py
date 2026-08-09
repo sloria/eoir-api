@@ -26,6 +26,7 @@ from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 from sentry_sdk.integrations.litestar import LitestarIntegration
 
 from eoir_api.a_number import redact_path
+from eoir_api.exceptions import CaptchaError
 from eoir_api.lib.acis import AcisBrowser
 from eoir_api.routes import ROUTE_HANDLERS
 from eoir_api.service import CaseService
@@ -93,7 +94,21 @@ def create_openapi_config() -> OpenAPIConfig:
     )
 
 
-def _scrub_sentry_event(event: Any, _hint: Any) -> Any:
+def _caused_by_captcha_error(hint: Any) -> bool:
+    exc_info = (hint or {}).get("exc_info")
+    exc = exc_info[1] if exc_info else None
+    while exc is not None:
+        if isinstance(exc, CaptchaError):
+            return True
+        exc = exc.__cause__
+    return False
+
+
+def _scrub_sentry_event(event: Any, hint: Any) -> Any:
+    # Captcha errors are expected, so don't send them to Sentry
+    if _caused_by_captcha_error(hint):
+        return None
+
     # redact A-Numbers from URL and transaction names
     request = event.get("request")
     if request and request.get("url"):
