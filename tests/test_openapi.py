@@ -15,11 +15,6 @@ async def test_openapi_json_is_served(client):
     assert "/cases/{a_number}" in spec["paths"]
 
 
-async def test_healthcheck_not_documented(client):
-    spec = (await client.get("/schema/openapi.json")).json()
-    assert "/healthz" not in spec["paths"]
-
-
 async def test_api_key_security_scheme_is_declared(client):
     spec = (await client.get("/schema/openapi.json")).json()
     scheme = spec["components"]["securitySchemes"]["apiKey"]

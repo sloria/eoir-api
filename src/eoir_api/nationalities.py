@@ -1,4 +1,4 @@
-"""EOIR nationality codes."""
+"""Utilities for working with EOIR nationality codes."""
 
 from __future__ import annotations
 

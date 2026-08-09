@@ -1,3 +1,5 @@
+"""Guards for litestar routes."""
+
 import hmac
 
 from litestar.connection import ASGIConnection

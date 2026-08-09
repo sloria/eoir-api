@@ -26,14 +26,13 @@ from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 from sentry_sdk.integrations.litestar import LitestarIntegration
 
 from eoir_api.a_number import redact_path
-from eoir_api.exceptions import CaptchaError
-from eoir_api.lib.acis import AcisBrowser
+from eoir_api.lib.acis import AcisBrowser, CaptchaError
 from eoir_api.routes import ROUTE_HANDLERS
 from eoir_api.service import CaseService
 from eoir_api.settings import Settings
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Callable
 
 logger = structlog.get_logger()
 
@@ -41,26 +40,28 @@ logger = structlog.get_logger()
 ##### Lifecycle hooks #####
 
 
-@asynccontextmanager
-async def manage_browser(app: Litestar) -> AsyncGenerator[None]:
-    browser: AcisBrowser = app.state.browser
+def make_browser_lifespan(browser: AcisBrowser) -> Callable[[Litestar], Any]:
     check_interval = 60
 
-    async def reap_idle_browser() -> None:
-        while True:
-            await anyio.sleep(check_interval)
-            try:
-                await browser.close_if_idle()
-            except Exception:
-                logger.exception("browser idle check failed")
+    @asynccontextmanager
+    async def browser_lifespan(_app: Litestar) -> AsyncGenerator[None]:
+        async def reap_idle_browser() -> None:
+            while True:
+                await anyio.sleep(check_interval)
+                try:
+                    await browser.close_if_idle()
+                except Exception:
+                    logger.exception("browser idle check failed")
 
-    async with anyio.create_task_group() as tg:
-        tg.start_soon(reap_idle_browser)
-        try:
-            yield
-        finally:
-            tg.cancel_scope.cancel()
-            await browser.close()
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(reap_idle_browser)
+            try:
+                yield
+            finally:
+                tg.cancel_scope.cancel()
+                await browser.close()
+
+    return browser_lifespan
 
 
 ##### App factory #####
@@ -168,7 +169,12 @@ def create_app(settings: Settings) -> Litestar:
 
     # XXX: Single browser and service instance to reuse
     # the browser session and TTLCache across requests
-    browser = AcisBrowser(settings)
+    browser = AcisBrowser(
+        profile_dir=settings.chrome_profile_dir,
+        lookup_timeout=settings.lookup_timeout,
+        lookup_attempts=settings.lookup_attempts,
+        idle_timeout=settings.browser_idle_timeout,
+    )
     service = CaseService(browser, settings)
 
     async def provide_settings() -> Settings:
@@ -179,10 +185,10 @@ def create_app(settings: Settings) -> Litestar:
 
     return Litestar(
         route_handlers=ROUTE_HANDLERS,
-        state=State({"settings": settings, "browser": browser, "service": service}),
+        state=State({"settings": settings}),
         openapi_config=create_openapi_config(),
         plugins=[structlog_plugin],
-        lifespan=[manage_browser],
+        lifespan=[make_browser_lifespan(browser)],
         dependencies={
             "settings": Provide(provide_settings),
             "service": Provide(provide_service),

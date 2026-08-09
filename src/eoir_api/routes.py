@@ -20,15 +20,17 @@ from litestar.status_codes import (
 
 from eoir_api.a_number import normalize_a_number, redact
 from eoir_api.exceptions import (
-    CaptchaError,
-    CaseNotFoundError,
-    CaseUnavailableError,
     InvalidANumberError,
     QueueTimeoutError,
     UnknownNationalityError,
-    UpstreamError,
 )
 from eoir_api.guards import require_api_key
+from eoir_api.lib.acis import (
+    CaptchaError,
+    CaseNotFoundError,
+    CaseUnavailableError,
+    UpstreamError,
+)
 from eoir_api.nationalities import resolve
 from eoir_api.service import Case, CaseService
 

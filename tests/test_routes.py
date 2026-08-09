@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from eoir_api.exceptions import (
+from eoir_api.lib.acis import (
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
@@ -74,13 +74,13 @@ async def test_lookup_accepts_nationality_name(client, browser):
         f"/cases/{A_NUMBER}?nationality=venezuela", headers=HEADERS
     )
     assert response.status_code == 200
-    assert browser.calls == [(A_NUMBER, "VE")]
+    assert browser.calls == [(A_NUMBER, "VE", "VENEZUELA")]
 
 
 async def test_lookup_normalizes_a_number_before_calling_acis(client, browser):
     response = await client.get("/cases/999-999-999?nationality=VE", headers=HEADERS)
     assert response.status_code == 200
-    assert browser.calls == [(A_NUMBER, "VE")]
+    assert browser.calls == [(A_NUMBER, "VE", "VENEZUELA")]
 
 
 ##### Input errors #####

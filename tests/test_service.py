@@ -4,7 +4,8 @@ import datetime as dt
 
 import pytest
 
-from eoir_api.exceptions import CaptchaError, QueueTimeoutError
+from eoir_api.exceptions import QueueTimeoutError
+from eoir_api.lib.acis import CaptchaError
 from eoir_api.nationalities import resolve
 from eoir_api.service import CaseService
 
@@ -24,7 +25,7 @@ async def test_second_call_is_served_from_cache(service, browser):
     assert first.cached is False
     assert second.cached is True
     # The browser was only driven once.
-    assert browser.calls == [(A_NUMBER, "VE")]
+    assert browser.calls == [(A_NUMBER, "VE", "VENEZUELA")]
 
 
 async def test_cache_hit_does_not_refresh_retrieved_at(service, time_machine):
@@ -60,7 +61,10 @@ async def test_refresh_bypasses_cache(service, browser):
 async def test_cache_is_keyed_on_nationality(service, browser):
     await service.get_case(A_NUMBER, VE)
     await service.get_case(A_NUMBER, resolve("MX"))
-    assert browser.calls == [(A_NUMBER, "VE"), (A_NUMBER, "MX")]
+    assert browser.calls == [
+        (A_NUMBER, "VE", "VENEZUELA"),
+        (A_NUMBER, "MX", "MEXICO"),
+    ]
 
 
 async def test_failures_are_not_cached(service, browser):

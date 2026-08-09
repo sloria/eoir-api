@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from eoir_api.exceptions import (
+from eoir_api.lib.acis import (
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
     UpstreamError,
+    _Capture,
+    option_label,
 )
-from eoir_api.lib.acis import AcisBrowser, _Capture, option_label
-from eoir_api.nationalities import resolve
 
 if TYPE_CHECKING:
     import re
@@ -73,10 +73,12 @@ class FakePage:
         return
 
 
-async def test_nationality_is_chosen_by_exact_option_not_the_highlighted_one(settings):
+async def test_nationality_is_chosen_by_exact_option_not_the_highlighted_one(
+    acis_browser,
+):
     page = FakePage()
 
-    await AcisBrowser(settings)._fill_form(cast("Page", page), "245494576", "GV")
+    await acis_browser._fill_form(cast("Page", page), "245494576", "GV", "GUINEA")
 
     assert page.keyboard.typed == ["245494576", "GUINEA"]
     # Enter would take "EQUATORIAL GUINEA", the first substring match.
@@ -91,76 +93,76 @@ async def test_nationality_is_chosen_by_exact_option_not_the_highlighted_one(set
 
 # Matching the bare name finds no option at all.
 def test_option_label_includes_the_code():
-    assert option_label(resolve("Guinea")).pattern == r"^GUINEA\ \(GV\)$"
+    assert option_label("GUINEA", "GV").pattern == r"^GUINEA\ \(GV\)$"
 
 
 ##### Failure classification #####
 
 
-def test_no_request_means_no_token_was_minted(settings):
+def test_no_request_means_no_token_was_minted(acis_browser):
     with pytest.raises(CaptchaError) as excinfo:
-        AcisBrowser(settings)._parse(_Capture(requested=False))
+        acis_browser._parse(_Capture(requested=False))
     assert excinfo.value.reason is CaptchaError.Reason.NO_REQUEST
 
 
-def test_request_without_a_response_is_a_timeout_not_a_mint_failure(settings):
+def test_request_without_a_response_is_a_timeout_not_a_mint_failure(acis_browser):
     with pytest.raises(CaptchaError) as excinfo:
-        AcisBrowser(settings)._parse(_Capture(requested=True))
+        acis_browser._parse(_Capture(requested=True))
     assert excinfo.value.reason is CaptchaError.Reason.NO_RESPONSE
-    assert str(settings.lookup_timeout) in str(excinfo.value)
+    assert str(acis_browser.lookup_timeout) in str(excinfo.value)
 
 
-def test_upstream_refusal_is_recorded_as_rejected(settings):
+def test_upstream_refusal_is_recorded_as_rejected(acis_browser):
     capture = responded({"message": "Invalid Captcha Provided"})
     with pytest.raises(CaptchaError) as excinfo:
-        AcisBrowser(settings)._parse(capture)
+        acis_browser._parse(capture)
     assert excinfo.value.reason is CaptchaError.Reason.REJECTED
 
 
 ##### Non-captcha outcomes are unchanged #####
 
 
-def test_successful_payload_is_returned_verbatim(settings, master_hearing):
-    assert AcisBrowser(settings)._parse(responded(master_hearing)) == master_hearing
+def test_successful_payload_is_returned_verbatim(acis_browser, master_hearing):
+    assert acis_browser._parse(responded(master_hearing)) == master_hearing
 
 
-def test_missing_case_raises_not_found(settings):
+def test_missing_case_raises_not_found(acis_browser):
     capture = responded({"message": "No case info found for A-Number"})
     with pytest.raises(CaseNotFoundError):
-        AcisBrowser(settings)._parse(capture)
+        acis_browser._parse(capture)
 
 
-def test_bad_nationality_code_raises_not_found(settings):
+def test_bad_nationality_code_raises_not_found(acis_browser):
     capture = responded({"message": "Invalid nationality code"})
     with pytest.raises(CaseNotFoundError):
-        AcisBrowser(settings)._parse(capture)
+        acis_browser._parse(capture)
 
 
-def test_withheld_case_raises_unavailable(settings):
+def test_withheld_case_raises_unavailable(acis_browser):
     capture = responded({"message": "Case information is unavailable"})
     with pytest.raises(CaseUnavailableError):
-        AcisBrowser(settings)._parse(capture)
+        acis_browser._parse(capture)
 
 
-def test_unrecognized_message_raises_upstream_error(settings):
+def test_unrecognized_message_raises_upstream_error(acis_browser):
     with pytest.raises(UpstreamError):
-        AcisBrowser(settings)._parse(responded({"message": "Something else broke"}))
+        acis_browser._parse(responded({"message": "Something else broke"}))
 
 
-def test_non_json_body_raises_upstream_error(settings):
+def test_non_json_body_raises_upstream_error(acis_browser):
     capture = _Capture(requested=True, status=200, body="<html>502</html>")
     capture.received.set()
     with pytest.raises(UpstreamError):
-        AcisBrowser(settings)._parse(capture)
+        acis_browser._parse(capture)
 
 
-def test_unreadable_body_raises_upstream_error(settings):
+def test_unreadable_body_raises_upstream_error(acis_browser):
     capture = _Capture(requested=True, status=500, body=None)
     capture.received.set()
     with pytest.raises(UpstreamError):
-        AcisBrowser(settings)._parse(capture)
+        acis_browser._parse(capture)
 
 
-def test_error_status_without_a_message_raises_upstream_error(settings):
+def test_error_status_without_a_message_raises_upstream_error(acis_browser):
     with pytest.raises(UpstreamError):
-        AcisBrowser(settings)._parse(responded({}, status=500))
+        acis_browser._parse(responded({}, status=500))
