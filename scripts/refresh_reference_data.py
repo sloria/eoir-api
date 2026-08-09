@@ -15,8 +15,7 @@ from typing import Any
 
 REFERENCE_DIR = Path(__file__).parent.parent / "src" / "eoir_api" / "reference"
 
-BASE = "https://acis.eoir.justice.gov/page-data/sq/d"
-NATIONALITY_URL = f"{BASE}/1791802679.json"
+NATIONALITY_URL = "https://acis.eoir.justice.gov/page-data/sq/d/1791802679.json"
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "

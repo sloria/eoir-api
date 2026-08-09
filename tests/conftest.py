@@ -52,16 +52,6 @@ class FakeAcisBrowser:
         self.payload = payload
         self.error: Exception | None = None
         self.calls: list[tuple[str, str, str]] = []
-        self.started = False
-
-    async def start(self) -> None:
-        self.started = True
-
-    async def close(self) -> None:
-        self.started = False
-
-    async def close_if_idle(self) -> bool:
-        return False
 
     async def lookup(
         self, a_number: str, nat_code: str, nat_name: str

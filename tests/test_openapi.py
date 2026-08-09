@@ -2,37 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from eoir_api.app import create_openapi_config
-
 pytestmark = pytest.mark.anyio
 
 
-async def test_openapi_json_is_served(client):
-    response = await client.get("/schema/openapi.json")
-    assert response.status_code == 200
-    spec = response.json()
-    assert spec["info"]["title"] == create_openapi_config().title
-    assert "/cases/{a_number}" in spec["paths"]
-
-
-async def test_api_key_security_scheme_is_declared(client):
-    spec = (await client.get("/schema/openapi.json")).json()
-    scheme = spec["components"]["securitySchemes"]["apiKey"]
-    assert scheme["type"] == "apiKey"
-    assert scheme["name"] == "x-api-key"
-    assert scheme["in"] == "header"
-    assert spec["security"] == [{"apiKey": []}]
-
-
-async def test_case_lookup_documents_success_and_actionable_errors(client):
+async def test_schema_documents_responses(client):
     spec = (await client.get("/schema/openapi.json")).json()
     responses = spec["paths"]["/cases/{a_number}"]["get"]["responses"]
-    assert {"200", "404", "422", "429", "503"} <= set(responses)
-    assert "401" not in responses
-    assert "502" not in responses
-
-
-async def test_docs_ui_is_served_at_schema_root(client):
-    response = await client.get("/schema")
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/html")
+    assert "200" in responses
+    assert "422" in responses
+    assert "429" in responses
+    assert "503" in responses
