@@ -9,6 +9,7 @@ from eoir_api.lib.acis import (
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
+    InvalidNationalityError,
     UpstreamError,
     _Capture,
     option_label,
@@ -66,9 +67,9 @@ def test_missing_case_raises_not_found(acis_browser):
         acis_browser._parse(capture)
 
 
-def test_bad_nationality_code_raises_not_found(acis_browser):
+def test_bad_nationality_code_raises_invalid_nationality(acis_browser):
     capture = responded({"message": "Invalid nationality code"})
-    with pytest.raises(CaseNotFoundError):
+    with pytest.raises(InvalidNationalityError):
         acis_browser._parse(capture)
 
 
