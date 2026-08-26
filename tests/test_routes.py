@@ -6,6 +6,7 @@ from eoir_api.lib.acis import (
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
+    InvalidNationalityError,
     UpstreamError,
 )
 
@@ -107,6 +108,13 @@ async def test_iso_only_code_returns_400(client):
 
 async def test_case_not_found_returns_404(client, browser):
     browser.error = CaseNotFoundError("No case info found")
+    response = await client.get(f"/cases/{A_NUMBER}?nationality=VE", headers=HEADERS)
+    assert response.status_code == 404
+    assert "a-number" in response.json()["detail"].lower()
+
+
+async def test_invalid_nationality_returns_404(client, browser):
+    browser.error = InvalidNationalityError("Invalid nationality code")
     response = await client.get(f"/cases/{A_NUMBER}?nationality=VE", headers=HEADERS)
     assert response.status_code == 404
     assert "nationality" in response.json()["detail"].lower()

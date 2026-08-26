@@ -60,7 +60,11 @@ class CaptchaError(AcisError):
 
 
 class CaseNotFoundError(AcisError):
-    """Raised when ACIS has no case for a given A-Number and nationality."""
+    """Raised when ACIS has no case for a given A-Number."""
+
+
+class InvalidNationalityError(AcisError):
+    """Raised when ACIS rejects the nationality code."""
 
 
 class CaseUnavailableError(AcisError):
@@ -312,9 +316,10 @@ class AcisBrowser:
                 raise CaptchaError(message, reason=CaptchaError.Reason.REJECTED)
             if "Case information is unavailable" in message:
                 raise CaseUnavailableError(message)
-            not_found = ("No case info found", "Invalid nationality code")
-            if any(fragment in message for fragment in not_found):
+            if "No case info found" in message:
                 raise CaseNotFoundError(message)
+            if "Invalid nationality code" in message:
+                raise InvalidNationalityError(message)
             raise UpstreamError(message)
 
         if status != 200:

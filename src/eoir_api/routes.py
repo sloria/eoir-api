@@ -29,6 +29,7 @@ from eoir_api.lib.acis import (
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
+    InvalidNationalityError,
     UpstreamError,
 )
 from eoir_api.nationalities import resolve
@@ -97,8 +98,11 @@ async def get_case(
         return await service.get_case(cleaned, resolved, refresh=refresh)
     except CaseNotFoundError as exc:
         log.info("case.not_found")
+        raise NotFoundException("No case found for that A-Number.") from exc
+    except InvalidNationalityError as exc:
+        log.info("case.invalid_nationality")
         raise NotFoundException(
-            "No case found for that A-Number and nationality."
+            "No case found for that A-Number with that nationality code."
         ) from exc
     except CaseUnavailableError as exc:
         log.info("case.unavailable")
