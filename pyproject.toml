@@ -37,6 +37,7 @@ members = ["packages/*"]
 
 [tool.uv.sources]
 acis-browser = { workspace = true }
+acis-core = { workspace = true }
 
 [tool.ruff]
 fix = true
