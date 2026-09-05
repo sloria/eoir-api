@@ -8,15 +8,15 @@ import json
 import re
 import time
 from dataclasses import dataclass, field
-from enum import StrEnum, auto
 from typing import TYPE_CHECKING, Any, Literal, Self
 
 import structlog
+from acis_core.a_numbers import redact
+from acis_core.outcome import Outcome
 from patchright.async_api import Error as PlaywrightError
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 from patchright.async_api import async_playwright
 
-from acis_browser.a_number import redact
 from acis_browser.exceptions import (
     CaptchaError,
     CaseNotFoundError,
@@ -44,38 +44,6 @@ ACIS_URL = "https://acis.eoir.justice.gov/en/"
 
 def option_label(nat_name: str, nat_code: str) -> re.Pattern[str]:
     return re.compile(rf"^{re.escape(f'{nat_name} ({nat_code})')}$", re.IGNORECASE)
-
-
-##### Outcomes #####
-
-
-class Outcome(StrEnum):
-    """Classification of an ACIS payload by its pinned ``message`` fragments."""
-
-    OK = auto()
-    CAPTCHA_REJECTED = auto()
-    UNAVAILABLE = auto()
-    NOT_FOUND = auto()
-    INVALID_NATIONALITY = auto()
-    OTHER = auto()
-
-    @classmethod
-    def from_payload(cls, payload: dict[str, Any]) -> Outcome:
-        if isinstance(payload.get("Data"), dict):
-            return cls.OK
-        message = payload.get("message") or ""
-        for fragment, outcome in _MESSAGES:
-            if fragment in message:
-                return outcome
-        return cls.OTHER
-
-
-_MESSAGES = (
-    ("Invalid Captcha Provided", Outcome.CAPTCHA_REJECTED),
-    ("Case information is unavailable", Outcome.UNAVAILABLE),
-    ("No case info found", Outcome.NOT_FOUND),
-    ("Invalid nationality code", Outcome.INVALID_NATIONALITY),
-)
 
 
 def raise_for_outcome(payload: dict[str, Any]) -> None:
