@@ -6,16 +6,14 @@ import os
 
 import pytest
 
-from eoir_api.lib.acis import AcisBrowser, CaseNotFoundError
-from eoir_api.nationalities import resolve
+from acis_browser import AcisBrowser, Outcome, resolve
 
 pytestmark = [pytest.mark.anyio, pytest.mark.live]
 
 TEST_A_NUMBER = os.environ.get("EOIR_TEST_A_NUMBER", "")
 TEST_NATIONALITY = os.environ.get("EOIR_TEST_NATIONALITY", "")
 
-# Keys eoir-notify decodes. This service passes the payload through untouched,
-# so nothing else in either codebase would notice EOIR renaming one of them.
+# Keys consumers decode; the payload is passed through untouched.
 REQUIRED_KEYS = {
     "Data": (
         "AlienName",
@@ -56,8 +54,8 @@ def live_browser(tmp_path) -> AcisBrowser:
 
 async def test_captcha_token_is_accepted(live_browser):
     async with live_browser as browser:
-        with pytest.raises(CaseNotFoundError):
-            await browser.lookup("123456789", "MX", "MEXICO")
+        payload = await browser.lookup("123456789", "MX", "MEXICO")
+    assert Outcome.from_payload(payload) is Outcome.NOT_FOUND
 
 
 @pytest.mark.skipif(

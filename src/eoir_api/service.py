@@ -9,10 +9,10 @@ from typing import Any, Protocol
 
 import msgspec
 import structlog
+from acis_browser import Nationality, raise_for_outcome
 
 from eoir_api.exceptions import QueueTimeoutError
 from eoir_api.lib.cache import TTLCache
-from eoir_api.nationalities import Nationality
 from eoir_api.settings import Settings
 
 logger = structlog.get_logger()
@@ -103,6 +103,7 @@ class CaseService:
                 _EWMA_ALPHA * duration + (1 - _EWMA_ALPHA) * self.avg_lookup_seconds
             )
 
+        raise_for_outcome(payload)
         entry = self._cache.set(key, payload)
         logger.info(
             "lookup.success",

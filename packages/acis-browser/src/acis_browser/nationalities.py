@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
-from eoir_api.exceptions import UnknownNationalityError
+from acis_browser.exceptions import UnknownNationalityError
 
 HERE = Path(__file__).parent
 REFERENCE_FILE = HERE / "reference" / "nationality-codes.json"

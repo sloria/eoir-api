@@ -1,0 +1,25 @@
+[project]
+name = "acis-browser"
+version = "1.0.0"
+description = "Automated browser to perform ACIS lookups."
+readme = "README.md"
+authors = [{ name = "Steven Loria", email = "git@stevenloria.com" }]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.14"
+dependencies = ["patchright>=1.61.2", "structlog>=25.1.0"]
+
+[project.urls]
+Homepage = "https://github.com/sloria/eoir-api"
+Source = "https://github.com/sloria/eoir-api"
+Issues = "https://github.com/sloria/eoir-api/issues"
+
+[build-system]
+requires = ["flit_core<5"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+name = "acis_browser"
+
+[tool.ruff]
+extend = "../../pyproject.toml"

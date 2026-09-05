@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from eoir_api.a_number import normalize_a_number, redact
-from eoir_api.exceptions import InvalidANumberError
+from acis_browser import InvalidANumberError, normalize_a_number, redact
 
 
 @pytest.mark.parametrize(
