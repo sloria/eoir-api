@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 import pytest
+from patchright.async_api import Error as PlaywrightError
 
 from eoir_api.lib.acis import (
     CaptchaError,
@@ -14,6 +15,8 @@ from eoir_api.lib.acis import (
     _Capture,
     option_label,
 )
+
+pytestmark = pytest.mark.anyio
 
 
 def responded(payload: Any, *, status: int = 200) -> _Capture:
@@ -101,3 +104,61 @@ def test_unreadable_body_raises_upstream_error(acis_browser):
 def test_error_status_without_a_message_raises_upstream_error(acis_browser):
     with pytest.raises(UpstreamError):
         acis_browser._parse(responded({}, status=500))
+
+
+##### Browser lifecycle #####
+
+
+async def _lookup(browser, fake_once):
+    async def fake_start() -> None:
+        pass
+
+    browser.start = fake_start
+    browser._lookup_once = fake_once
+    return await browser.lookup("012345678", "MX", "MEXICO")
+
+
+async def test_a_lost_browser_is_reported_as_an_upstream_error(acis_browser):
+    async def fake_once(a_number, nat_code, nat_name):
+        raise PlaywrightError("Target page, context or browser has been closed")
+
+    closed = []
+
+    async def fake_close() -> None:
+        closed.append(True)
+
+    acis_browser.close = fake_close
+
+    with pytest.raises(UpstreamError):
+        await _lookup(acis_browser, fake_once)
+    assert closed == [True]
+
+
+async def test_a_lost_browser_is_discarded_even_when_closing_it_fails(acis_browser):
+    async def fake_once(a_number, nat_code, nat_name):
+        raise PlaywrightError("Browser closed")
+
+    async def fake_close() -> None:
+        raise PlaywrightError("Connection closed")
+
+    acis_browser.close = fake_close
+
+    with pytest.raises(UpstreamError):
+        await _lookup(acis_browser, fake_once)
+
+
+async def test_a_lost_browser_is_not_retried_as_a_captcha(acis_browser):
+    calls = []
+
+    async def fake_once(a_number, nat_code, nat_name):
+        calls.append(a_number)
+        raise PlaywrightError("Browser closed")
+
+    async def fake_close() -> None:
+        pass
+
+    acis_browser.close = fake_close
+
+    with pytest.raises(UpstreamError):
+        await _lookup(acis_browser, fake_once)
+    assert len(calls) == 1

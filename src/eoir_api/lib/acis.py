@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import time
@@ -191,6 +192,11 @@ class AcisBrowser:
                         if attempt >= attempts:
                             raise
                         await anyio.sleep(2**attempt)
+                    except PlaywrightError as exc:
+                        logger.warning("lookup.browser_lost", error=str(exc))
+                        with contextlib.suppress(PlaywrightError):
+                            await self.close()
+                        raise UpstreamError("Could not reach ACIS") from exc
                     else:
                         return payload
             finally:
