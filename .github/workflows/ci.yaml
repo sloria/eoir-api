@@ -50,5 +50,20 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
-      - name: Build acis-browser
-        run: uv build --package acis-browser
+      - name: Build packages
+        run: |
+          uv build --package acis-browser
+          uv build --package acis-core
+  test-acis-core-py311:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      # The root workspace requires 3.14; acis-core supports 3.11, so test it standalone.
+      - name: Run acis-core tests on Python 3.11
+        run: uv run --python 3.11 --isolated --no-project --with pytest --with ./packages/acis-core pytest packages/acis-core

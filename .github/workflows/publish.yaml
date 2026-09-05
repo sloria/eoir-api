@@ -1,9 +1,10 @@
-name: Publish acis-browser
+name: Publish package
 
 on:
   push:
     tags:
       - "acis-browser-v*"
+      - "acis-core-v*"
 
 permissions:
   contents: read
@@ -20,18 +21,23 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
 
       - name: Verify tag matches package version
+        id: pkg
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          tag_version="${TAG#acis-browser-v}"
-          pkg_version="$(uv version --package acis-browser --short --frozen)"
+          pkg="${TAG%-v*}"
+          tag_version="${TAG##*-v}"
+          pkg_version="$(uv version --package "$pkg" --short --frozen)"
           if [ "$tag_version" != "$pkg_version" ]; then
-            echo "Tag version '$tag_version' does not match packages/acis-browser version '$pkg_version'" >&2
+            echo "Tag version '$tag_version' does not match packages/$pkg version '$pkg_version'" >&2
             exit 1
           fi
+          echo "name=$pkg" >> "$GITHUB_OUTPUT"
 
       - name: Build distributions
-        run: uv build --package acis-browser
+        env:
+          PKG: ${{ steps.pkg.outputs.name }}
+        run: uv build --package "$PKG"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
