@@ -7,14 +7,11 @@ from acis_browser import (
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
-    InvalidANumberError,
     InvalidNationalityError,
-    UnknownNationalityError,
     UpstreamError,
-    normalize_a_number,
-    redact,
-    resolve,
 )
+from acis_core.a_numbers import InvalidANumberError, normalize_a_number, redact
+from acis_core.nationalities import UnknownNationalityError, resolve
 from litestar import Response, get
 from litestar.di import NamedDependency
 from litestar.exceptions import (
