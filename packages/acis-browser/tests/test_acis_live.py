@@ -5,8 +5,9 @@ from __future__ import annotations
 import os
 
 import pytest
+from acis_core.nationalities import resolve
 
-from acis_browser import AcisBrowser, Outcome, resolve
+from acis_browser import AcisBrowser, Outcome
 
 pytestmark = [pytest.mark.anyio, pytest.mark.live]
 

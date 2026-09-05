@@ -95,6 +95,6 @@ ignore = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "packages/acis-browser/tests"]
+testpaths = ["tests", "packages/acis-browser/tests", "packages/acis-core/tests"]
 addopts = "-m 'not live' --import-mode=importlib"
 markers = ["live: hits the real ACIS site with a real browser"]

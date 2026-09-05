@@ -18,12 +18,14 @@ name = "acis-browser"
 version = "1.0.0"
 source = { editable = "packages/acis-browser" }
 dependencies = [
+    { name = "acis-core" },
     { name = "patchright" },
     { name = "structlog" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "acis-core", editable = "packages/acis-core" },
     { name = "patchright", specifier = ">=1.61.2" },
     { name = "structlog", specifier = ">=25.1.0" },
 ]

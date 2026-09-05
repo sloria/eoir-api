@@ -3,21 +3,7 @@ from __future__ import annotations
 from enum import StrEnum, auto
 from typing import Any
 
-
-class AcisError(Exception):
-    """Base class for failures talking to ACIS."""
-
-    def __init__(self, *args: object, payload: dict[str, Any] | None = None) -> None:
-        super().__init__(*args)
-        self.payload = payload
-
-
-class InvalidANumberError(AcisError):
-    """Raised when an A-Number isn't valid."""
-
-
-class UnknownNationalityError(AcisError):
-    """Raised when a nationality code or name can't be resolved."""
+from acis_core.exceptions import AcisError
 
 
 class CaptchaError(AcisError):
