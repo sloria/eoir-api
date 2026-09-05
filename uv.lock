@@ -9,6 +9,7 @@ exclude-newer-span = "P1W"
 [manifest]
 members = [
     "acis-browser",
+    "acis-core",
     "eoir-api",
 ]
 
@@ -26,6 +27,11 @@ requires-dist = [
     { name = "patchright", specifier = ">=1.61.2" },
     { name = "structlog", specifier = ">=25.1.0" },
 ]
+
+[[package]]
+name = "acis-core"
+version = "1.0.0"
+source = { editable = "packages/acis-core" }
 
 [[package]]
 name = "anyio"
