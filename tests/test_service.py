@@ -3,7 +3,8 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
-from acis_browser import CaptchaError, resolve
+from acis_browser import CaptchaError
+from acis_core.nationalities import resolve
 
 from eoir_api.exceptions import QueueTimeoutError
 from eoir_api.service import CaseService

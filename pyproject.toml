@@ -9,6 +9,7 @@ license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
     "acis-browser",
+    "acis-core",
     "dataclass-settings>=0.5.0",
     "litestar[standard,structlog]>=2.14.0",
     "sentry-sdk[litestar]>=2.42.1",

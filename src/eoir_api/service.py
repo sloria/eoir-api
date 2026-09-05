@@ -9,7 +9,8 @@ from typing import Any, Protocol
 
 import msgspec
 import structlog
-from acis_browser import Nationality, raise_for_outcome
+from acis_browser import raise_for_outcome
+from acis_core.nationalities import Nationality
 
 from eoir_api.exceptions import QueueTimeoutError
 from eoir_api.lib.cache import TTLCache

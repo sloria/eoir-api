@@ -105,6 +105,7 @@ version = "26.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "acis-browser" },
+    { name = "acis-core" },
     { name = "dataclass-settings" },
     { name = "litestar", extra = ["standard", "structlog"] },
     { name = "sentry-sdk", extra = ["litestar"] },
@@ -123,6 +124,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "acis-browser", editable = "packages/acis-browser" },
+    { name = "acis-core", editable = "packages/acis-core" },
     { name = "dataclass-settings", specifier = ">=0.5.0" },
     { name = "litestar", extras = ["standard", "structlog"], specifier = ">=2.14.0" },
     { name = "sentry-sdk", extras = ["litestar"], specifier = ">=2.42.1" },

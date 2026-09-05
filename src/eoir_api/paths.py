@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from acis_browser import redact
+from acis_core.a_numbers import redact
 
 _CASE_PATH = re.compile(r"/cases/[^/?#]*\d[^/?#]*")
 
