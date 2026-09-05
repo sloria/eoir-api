@@ -3,6 +3,18 @@ from __future__ import annotations
 from typing import Annotated
 
 import structlog
+from acis_browser import (
+    CaptchaError,
+    CaseNotFoundError,
+    CaseUnavailableError,
+    InvalidANumberError,
+    InvalidNationalityError,
+    UnknownNationalityError,
+    UpstreamError,
+    normalize_a_number,
+    redact,
+    resolve,
+)
 from litestar import Response, get
 from litestar.di import NamedDependency
 from litestar.exceptions import (
@@ -18,21 +30,8 @@ from litestar.status_codes import (
     HTTP_502_BAD_GATEWAY,
 )
 
-from eoir_api.a_number import normalize_a_number, redact
-from eoir_api.exceptions import (
-    InvalidANumberError,
-    QueueTimeoutError,
-    UnknownNationalityError,
-)
+from eoir_api.exceptions import QueueTimeoutError
 from eoir_api.guards import require_api_key
-from eoir_api.lib.acis import (
-    CaptchaError,
-    CaseNotFoundError,
-    CaseUnavailableError,
-    InvalidNationalityError,
-    UpstreamError,
-)
-from eoir_api.nationalities import resolve
 from eoir_api.service import Case, CaseService
 
 logger = structlog.get_logger()

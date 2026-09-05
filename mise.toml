@@ -10,7 +10,7 @@ LITESTAR_APP = "eoir_api.asgi:app"
 description = "Set up the development environment"
 run = """
 test -f .env || cp .env.example .env
-uv sync --all-groups
+uv sync --all-packages --all-groups
 uv run patchright install chrome
 prek install -f
 """
@@ -41,4 +41,4 @@ run = "uv run --frozen litestar run --host {{env.HOST | default(value='127.0.0.1
 
 [tasks."refresh-reference"]
 description = "Re-fetch nationality codes and decision types from ACIS"
-run = "uv run python scripts/refresh_reference_data.py"
+run = "uv run python packages/acis-browser/scripts/refresh_reference_data.py"

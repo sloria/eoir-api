@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from acis_browser import CaseNotFoundError
 from litestar.datastructures import State
 from litestar.di import Provide
 from litestar.testing import AsyncTestClient, create_async_test_client
 
 from eoir_api.app import ROUTE_HANDLERS, create_openapi_config
-from eoir_api.lib.acis import AcisBrowser, CaseNotFoundError
 from eoir_api.service import CaseService
 from eoir_api.settings import Settings
 
@@ -71,16 +71,6 @@ def settings(tmp_path) -> Settings:
         api_secret="test-secret",
         chrome_profile_dir=tmp_path / "profile",
         sentry_dsn="",
-    )
-
-
-@pytest.fixture
-def acis_browser(settings) -> AcisBrowser:
-    return AcisBrowser(
-        profile_dir=settings.chrome_profile_dir,
-        lookup_timeout=settings.lookup_timeout,
-        lookup_attempts=settings.lookup_attempts,
-        idle_timeout=settings.browser_idle_timeout,
     )
 
 

@@ -3,10 +3,9 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
+from acis_browser import CaptchaError, resolve
 
 from eoir_api.exceptions import QueueTimeoutError
-from eoir_api.lib.acis import CaptchaError
-from eoir_api.nationalities import resolve
 from eoir_api.service import CaseService
 
 pytestmark = pytest.mark.anyio

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import sentry_sdk
 import structlog
+from acis_browser import AcisBrowser, CaptchaError
 from litestar import Litestar
 from litestar.datastructures import State
 from litestar.di import Provide
@@ -25,8 +26,7 @@ from litestar.openapi.spec import Components, SecurityScheme
 from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 from sentry_sdk.integrations.litestar import LitestarIntegration
 
-from eoir_api.a_number import redact_path
-from eoir_api.lib.acis import AcisBrowser, CaptchaError
+from eoir_api.paths import redact_path
 from eoir_api.routes import ROUTE_HANDLERS
 from eoir_api.service import CaseService
 from eoir_api.settings import Settings

@@ -6,6 +6,27 @@ requires-python = ">=3.14"
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P1W"
 
+[manifest]
+members = [
+    "acis-browser",
+    "eoir-api",
+]
+
+[[package]]
+name = "acis-browser"
+version = "1.0.0"
+source = { editable = "packages/acis-browser" }
+dependencies = [
+    { name = "patchright" },
+    { name = "structlog" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "patchright", specifier = ">=1.61.2" },
+    { name = "structlog", specifier = ">=25.1.0" },
+]
+
 [[package]]
 name = "anyio"
 version = "4.14.2"
@@ -75,15 +96,16 @@ name = "eoir-api"
 version = "26.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "acis-browser" },
     { name = "dataclass-settings" },
     { name = "litestar", extra = ["standard", "structlog"] },
-    { name = "patchright" },
     { name = "sentry-sdk", extra = ["litestar"] },
     { name = "structlog" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "anyio" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "time-machine" },
@@ -92,15 +114,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "acis-browser", editable = "packages/acis-browser" },
     { name = "dataclass-settings", specifier = ">=0.5.0" },
     { name = "litestar", extras = ["standard", "structlog"], specifier = ">=2.14.0" },
-    { name = "patchright", specifier = ">=1.61.2" },
     { name = "sentry-sdk", extras = ["litestar"], specifier = ">=2.42.1" },
     { name = "structlog", specifier = ">=25.1.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "anyio", specifier = ">=4.0.0" },
     { name = "pytest", specifier = ">=8.3.4" },
     { name = "ruff", specifier = ">=0.11.6" },
     { name = "time-machine", specifier = ">=2.16.0" },

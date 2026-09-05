@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import re
@@ -10,11 +11,19 @@ from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from typing import TYPE_CHECKING, Any, Literal, Self
 
-import anyio
 import structlog
 from patchright.async_api import Error as PlaywrightError
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 from patchright.async_api import async_playwright
+
+from acis_browser.a_number import redact
+from acis_browser.exceptions import (
+    CaptchaError,
+    CaseNotFoundError,
+    CaseUnavailableError,
+    InvalidNationalityError,
+    UpstreamError,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,43 +46,57 @@ def option_label(nat_name: str, nat_code: str) -> re.Pattern[str]:
     return re.compile(rf"^{re.escape(f'{nat_name} ({nat_code})')}$", re.IGNORECASE)
 
 
-##### Errors #####
+##### Outcomes #####
 
 
-class AcisError(Exception):
-    """Base class for failures talking to ACIS."""
+class Outcome(StrEnum):
+    """Classification of an ACIS payload by its pinned ``message`` fragments."""
+
+    OK = auto()
+    CAPTCHA_REJECTED = auto()
+    UNAVAILABLE = auto()
+    NOT_FOUND = auto()
+    INVALID_NATIONALITY = auto()
+    OTHER = auto()
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> Outcome:
+        if isinstance(payload.get("Data"), dict):
+            return cls.OK
+        message = payload.get("message") or ""
+        for fragment, outcome in _MESSAGES:
+            if fragment in message:
+                return outcome
+        return cls.OTHER
 
 
-class CaptchaError(AcisError):
-    """Raised when an hCaptcha token can't be obtained or the token is refused."""
-
-    class Reason(StrEnum):
-        NO_REQUEST = auto()
-        """Form was submitted but no case request followed."""
-        NO_RESPONSE = auto()
-        """Case request went out but nothing came back."""
-        REJECTED = auto()
-        """Token was submitted and rejected."""
-
-    def __init__(self, message: str, *, reason: Reason) -> None:
-        super().__init__(message)
-        self.reason = reason
+_MESSAGES = (
+    ("Invalid Captcha Provided", Outcome.CAPTCHA_REJECTED),
+    ("Case information is unavailable", Outcome.UNAVAILABLE),
+    ("No case info found", Outcome.NOT_FOUND),
+    ("Invalid nationality code", Outcome.INVALID_NATIONALITY),
+)
 
 
-class CaseNotFoundError(AcisError):
-    """Raised when ACIS has no case for a given A-Number."""
-
-
-class InvalidNationalityError(AcisError):
-    """Raised when ACIS rejects the nationality code."""
-
-
-class CaseUnavailableError(AcisError):
-    """Raised when the case exists but ACIS won't release information for it."""
-
-
-class UpstreamError(AcisError):
-    """Raised when ACIS returns an unexpected response."""
+def raise_for_outcome(payload: dict[str, Any]) -> None:
+    """Raise the exception matching the payload's outcome; return for a success."""
+    outcome = Outcome.from_payload(payload)
+    if outcome is Outcome.OK:
+        return
+    message = payload.get("message") or ""
+    if outcome is Outcome.CAPTCHA_REJECTED:
+        raise CaptchaError(
+            message, reason=CaptchaError.Reason.REJECTED, payload=payload
+        )
+    if outcome is Outcome.NOT_FOUND:
+        raise CaseNotFoundError(message, payload=payload)
+    if outcome is Outcome.INVALID_NATIONALITY:
+        raise InvalidNationalityError(message, payload=payload)
+    if outcome is Outcome.UNAVAILABLE:
+        raise CaseUnavailableError(message, payload=payload)
+    raise UpstreamError(
+        message or "ACIS returned an unexpected payload", payload=payload
+    )
 
 
 ##### Browser #####
@@ -84,7 +107,7 @@ class _Capture:
     requested: bool = False
     status: int = 0
     body: str | None = None
-    received: anyio.Event = field(default_factory=anyio.Event)
+    received: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 @dataclass(kw_only=True)
@@ -97,7 +120,7 @@ class AcisBrowser:
     idle_timeout: float = 900
 
     # Lock to ensure only one lookup at a time
-    _lock: anyio.Lock = field(default_factory=anyio.Lock, init=False, repr=False)
+    _lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _playwright: Playwright | None = field(default=None, init=False, repr=False)
     _context: BrowserContext | None = field(default=None, init=False, repr=False)
     _last_used: float = field(default=0.0, init=False, repr=False)
@@ -165,10 +188,11 @@ class AcisBrowser:
     async def lookup(
         self, a_number: str, nat_code: str, nat_name: str
     ) -> dict[str, Any]:
-        """Return the raw ACIS JSON payload for a case. Retries transient captcha failures.
+        """Return the raw ACIS JSON payload for a case, whatever the outcome.
 
-        The form takes the nationality *name*; the code only disambiguates the
-        option label, since names are substrings of one another.
+        Retries transient captcha failures. The form takes the nationality
+        *name*; the code only disambiguates the option label, since names are
+        substrings of one another.
         """
         attempts = self.lookup_attempts
         async with self._lock:
@@ -185,18 +209,19 @@ class AcisBrowser:
                             "lookup.captcha_failed",
                             attempt=attempt,
                             attempts=attempts,
+                            a_number=redact(a_number),
                             nat_code=nat_code,
                             reason=exc.reason,
                             error=str(exc),
                         )
                         if attempt >= attempts:
                             raise
-                        await anyio.sleep(2**attempt)
+                        await asyncio.sleep(2**attempt)
                     except PlaywrightError as exc:
                         logger.warning("lookup.browser_lost", error=str(exc))
                         with contextlib.suppress(PlaywrightError):
                             await self.close()
-                        raise UpstreamError("Could not reach ACIS") from exc
+                        raise UpstreamError("Chrome is no longer available") from exc
                     else:
                         return payload
             finally:
@@ -241,8 +266,9 @@ class AcisBrowser:
             await self._dismiss_modal(page)
             await self._fill_form(page, a_number, nat_code, nat_name)
             await page.locator("#btn_submit").click()
-            with anyio.move_on_after(self.lookup_timeout):
-                await captured.received.wait()
+            with contextlib.suppress(TimeoutError):
+                async with asyncio.timeout(self.lookup_timeout):
+                    await captured.received.wait()
         except PlaywrightError as exc:
             raise UpstreamError("Could not lookup case") from exc
         finally:
@@ -315,21 +341,17 @@ class AcisBrowser:
             payload = json.loads(body)
         except json.JSONDecodeError as exc:
             raise UpstreamError(f"ACIS returned non-JSON (HTTP {status})") from exc
+        if not isinstance(payload, dict):
+            raise UpstreamError("ACIS returned an unexpected payload")
 
-        message = payload.get("message") if isinstance(payload, dict) else None
-        if message:
-            if "Invalid Captcha Provided" in message:
-                raise CaptchaError(message, reason=CaptchaError.Reason.REJECTED)
-            if "Case information is unavailable" in message:
-                raise CaseUnavailableError(message)
-            if "No case info found" in message:
-                raise CaseNotFoundError(message)
-            if "Invalid nationality code" in message:
-                raise InvalidNationalityError(message)
-            raise UpstreamError(message)
+        outcome = Outcome.from_payload(payload)
+        if outcome is Outcome.CAPTCHA_REJECTED:
+            raise CaptchaError(
+                payload["message"], reason=CaptchaError.Reason.REJECTED, payload=payload
+            )
+        if outcome not in (Outcome.OK, Outcome.OTHER):
+            return payload
 
         if status != 200:
             raise UpstreamError(f"ACIS returned HTTP {status}")
-        if not isinstance(payload, dict):
-            raise UpstreamError("ACIS returned an unexpected payload")
         return payload

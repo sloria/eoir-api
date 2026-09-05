@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import pytest
-
-from eoir_api.lib.acis import (
+from acis_browser import (
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from eoir_api.exceptions import UnknownNationalityError
-from eoir_api.nationalities import get_by_code, resolve
+from acis_browser import UnknownNationalityError, get_by_code, resolve
 
 
 def test_resolve_by_code():

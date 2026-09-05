@@ -1,0 +1,80 @@
+{
+  "Language": "EN",
+  "Data": {
+    "ValidAlienNumber": true,
+    "ReopenExists": false,
+    "AppealFiled": false,
+    "CaseAppealExists": false,
+    "MTR_BIA_Appeal": false,
+    "MTR_BIA_Type": null,
+    "AlienName": "DOE, JANE",
+    "CaseID": 10000001,
+    "OSC_Date": "2025-01-16T00:00:00",
+    "ClockStatus": "R",
+    "ElapsedDays": "543",
+    "LatestHearingDate": "2026-08-06T00:00:00",
+    "LatestHearingTime": "8:30 AM",
+    "LatestCalType": "M",
+    "DocketDate": "2025-01-17T00:00:00",
+    "CaseContactInfo": "26 FEDERAL PLZ 12TH FL RM 1237|NEW YORK, NY 10278|2126026500",
+    "CaseDecisionString": null,
+    "MTRDecisionString": null,
+    "ReopenDecisionString": null,
+    "AppealDecisionString": null,
+    "PendingAtBIA": false
+  },
+  "AlienNumber": "999999999",
+  "Proceeding": {
+    "DateAppealDue": null,
+    "BaseCityCode": "NYC",
+    "Generation": "98",
+    "Subgeneration": null,
+    "HearingLocationCode": "NYC",
+    "HearingLocationAddress": "NEW YORK CITY, NEW YORK|26 FEDERAL PLZ, 12TH FL RM1237|NEW YORK, NY 10278",
+    "ContactAddress": null,
+    "CompDate": null,
+    "IJCode": null,
+    "IJName": null,
+    "CaseType": "RMV",
+    "DecisionCode": null,
+    "OtherComp": null,
+    "OtherReceived1": null,
+    "OtherReceived2": null,
+    "BatteredSpouse": false,
+    "ReleaseInfo": "Y"
+  },
+  "Reopen": {
+    "CompDate": null,
+    "Decision": null,
+    "MotionReceivedDate": null
+  },
+  "Appeal": {
+    "AlienBriefDue": null,
+    "AlienBriefFiled": null,
+    "BIADecision": null,
+    "BIADecisionDate": null,
+    "DHSBriefDue": null,
+    "DHSBriefFiled": null,
+    "FiledDate": null,
+    "AppealType": null
+  },
+  "MTR": {
+    "MTRDecision": null,
+    "MTRDecisionDate": null,
+    "MTRAppealFiledDate": null
+  },
+  "Schedule": {
+    "ProceedingID": 20000001,
+    "AdjDate": "2026-08-06T00:00:00",
+    "IJ_Code": "ARO",
+    "IJ_Name": "Roe, Alex",
+    "IJ_WebExURLLink": "https://eoir.webex.com/meet/IJ.Roe",
+    "AdjTime": "8:30 AM",
+    "CalType": "M",
+    "ScheduleType": "MR",
+    "HearingMedium": "P",
+    "HearingLocationCode": "NYC",
+    "HearingLocationAddress": "NEW YORK CITY, NEW YORK|26 FEDERAL PLZ, 12TH FL RM1237|NEW YORK, NY 10278",
+    "ContactAddress": "26 FEDERAL PLZ 12TH FL RM 1237|NEW YORK, NY 10278|2126026500"
+  }
+}

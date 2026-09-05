@@ -1,4 +1,4 @@
-"""Re-fetch nationality codes from ACIS and save them to src/eoir_api/reference/.
+"""Re-fetch nationality codes from ACIS and save them to the package's reference/.
 
 Usage:
     mise run refresh-reference
@@ -13,7 +13,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-REFERENCE_DIR = Path(__file__).parent.parent / "src" / "eoir_api" / "reference"
+REFERENCE_DIR = Path(__file__).parent.parent / "src" / "acis_browser" / "reference"
 
 NATIONALITY_URL = "https://acis.eoir.justice.gov/page-data/sq/d/1791802679.json"
 

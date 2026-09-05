@@ -8,15 +8,16 @@ license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
+    "acis-browser",
     "dataclass-settings>=0.5.0",
     "litestar[standard,structlog]>=2.14.0",
-    "patchright>=1.61.2",
     "sentry-sdk[litestar]>=2.42.1",
     "structlog>=25.1.0",
 ]
 
 [dependency-groups]
 dev = [
+    "anyio>=4.0.0",
     "pytest>=8.3.4",
     "ruff>=0.11.6",
     "time-machine>=2.16.0",
@@ -30,6 +31,12 @@ build-backend = "flit_core.buildapi"
 [tool.uv]
 default-groups = ["dev"]
 exclude-newer = "1 week"
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+acis-browser = { workspace = true }
 
 [tool.ruff]
 fix = true
@@ -76,7 +83,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = [
+"**/tests/*" = [
     "ARG",     # unused arguments are fine in tests
     "PLR0915", # allow lots of statements
     "PT007",   # ignore false positives due to https://github.com/astral-sh/ruff/issues/14743
@@ -87,5 +94,6 @@ ignore = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-m 'not live'"
+testpaths = ["tests", "packages/acis-browser/tests"]
+addopts = "-m 'not live' --import-mode=importlib"
 markers = ["live: hits the real ACIS site with a real browser"]
