@@ -85,13 +85,12 @@ class AcisBrowser:
     profile_dir: Path
     lookup_timeout: float = 20
     lookup_attempts: int = 2
-    idle_timeout: float = 900
 
-    # Lock to ensure only one lookup at a time
+    last_used: float = field(default=0.0, init=False)
+    # Lock to ensure only one lookup or close at a time
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _playwright: Playwright | None = field(default=None, init=False, repr=False)
     _context: BrowserContext | None = field(default=None, init=False, repr=False)
-    _last_used: float = field(default=0.0, init=False, repr=False)
 
     ##### Lifecycle #####
 
@@ -108,9 +107,12 @@ class AcisBrowser:
             headless=False,
             no_viewport=True,
         )
-        self._last_used = time.monotonic()
 
     async def close(self) -> None:
+        async with self._lock:
+            await self._close()
+
+    async def _close(self) -> None:
         if self._context is not None:
             logger.info("browser stopping")
             try:
@@ -122,22 +124,6 @@ class AcisBrowser:
                 await self._playwright.stop()
             finally:
                 self._playwright = None
-
-    async def close_if_idle(self) -> bool:
-        if self._context is None:
-            return False
-        idle = time.monotonic() - self._last_used
-        if idle < self.idle_timeout:
-            return False
-        async with self._lock:
-            # Re-check under the lock: a lookup may have started meanwhile.
-            if self._context is None:
-                return False
-            if time.monotonic() - self._last_used < self.idle_timeout:
-                return False
-            logger.info("browser idle, closing", idle_seconds=round(idle))
-            await self.close()
-            return True
 
     async def __aenter__(self) -> Self:
         await self.start()
@@ -164,8 +150,8 @@ class AcisBrowser:
         """
         attempts = self.lookup_attempts
         async with self._lock:
+            self.last_used = time.monotonic()
             await self.start()
-            self._last_used = time.monotonic()
             try:
                 attempt = 0
                 while True:
@@ -188,12 +174,12 @@ class AcisBrowser:
                     except PlaywrightError as exc:
                         logger.warning("lookup.browser_lost", error=str(exc))
                         with contextlib.suppress(PlaywrightError):
-                            await self.close()
+                            await self._close()
                         raise UpstreamError("Chrome is no longer available") from exc
                     else:
                         return payload
             finally:
-                self._last_used = time.monotonic()
+                self.last_used = time.monotonic()
 
     async def _lookup_once(
         self, a_number: str, nat_code: str, nat_name: str

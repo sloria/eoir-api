@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.metadata
 import logging
 import sys
+import time
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -40,7 +41,9 @@ logger = structlog.get_logger()
 ##### Lifecycle hooks #####
 
 
-def make_browser_lifespan(browser: AcisBrowser) -> Callable[[Litestar], Any]:
+def make_browser_lifespan(
+    browser: AcisBrowser, idle_timeout: float
+) -> Callable[[Litestar], Any]:
     check_interval = 60
 
     @asynccontextmanager
@@ -48,10 +51,14 @@ def make_browser_lifespan(browser: AcisBrowser) -> Callable[[Litestar], Any]:
         async def reap_idle_browser() -> None:
             while True:
                 await anyio.sleep(check_interval)
+                idle = time.monotonic() - browser.last_used
+                if idle < idle_timeout:
+                    continue
+                logger.info("browser idle, closing", idle_seconds=round(idle))
                 try:
-                    await browser.close_if_idle()
+                    await browser.close()
                 except Exception:
-                    logger.exception("browser idle check failed")
+                    logger.exception("browser idle close failed")
 
         async with anyio.create_task_group() as tg:
             tg.start_soon(reap_idle_browser)
@@ -173,7 +180,6 @@ def create_app(settings: Settings) -> Litestar:
         profile_dir=settings.chrome_profile_dir,
         lookup_timeout=settings.lookup_timeout,
         lookup_attempts=settings.lookup_attempts,
-        idle_timeout=settings.browser_idle_timeout,
     )
     service = CaseService(browser, settings)
 
@@ -188,7 +194,7 @@ def create_app(settings: Settings) -> Litestar:
         state=State({"settings": settings}),
         openapi_config=create_openapi_config(),
         plugins=[structlog_plugin],
-        lifespan=[make_browser_lifespan(browser)],
+        lifespan=[make_browser_lifespan(browser, settings.browser_idle_timeout)],
         dependencies={
             "settings": Provide(provide_settings),
             "service": Provide(provide_service),

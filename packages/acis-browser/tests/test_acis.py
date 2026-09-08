@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -219,7 +220,7 @@ async def test_browser_lost_mid_lookup_is_converted_and_discards_the_context(
     async def fake_close() -> None:
         closed.append(True)
 
-    acis_browser.close = fake_close
+    acis_browser._close = fake_close
 
     with pytest.raises(UpstreamError):
         await lookup_with(acis_browser, fake_once)
@@ -236,7 +237,7 @@ async def test_browser_lost_is_not_retried_as_a_captcha(acis_browser):
     async def fake_close() -> None:
         pass
 
-    acis_browser.close = fake_close
+    acis_browser._close = fake_close
 
     with pytest.raises(UpstreamError):
         await lookup_with(acis_browser, fake_once)
@@ -250,7 +251,34 @@ async def test_browser_lost_is_discarded_even_when_closing_it_fails(acis_browser
     async def fake_close() -> None:
         raise PlaywrightError("Connection closed")
 
-    acis_browser.close = fake_close
+    acis_browser._close = fake_close
 
     with pytest.raises(UpstreamError):
         await lookup_with(acis_browser, fake_once)
+
+
+async def test_close_waits_for_an_in_flight_lookup(acis_browser):
+    started = asyncio.Event()
+    finish = asyncio.Event()
+    events = []
+
+    async def fake_once(a_number, nat_code, nat_name):
+        started.set()
+        await finish.wait()
+        events.append("lookup")
+        return {"Data": {}}
+
+    async def fake_close() -> None:
+        events.append("close")
+
+    acis_browser._close = fake_close
+    lookup = asyncio.create_task(lookup_with(acis_browser, fake_once))
+    await started.wait()
+
+    close = asyncio.create_task(acis_browser.close())
+    await asyncio.sleep(0)
+    assert events == []
+
+    finish.set()
+    await asyncio.gather(lookup, close)
+    assert events == ["lookup", "close"]
