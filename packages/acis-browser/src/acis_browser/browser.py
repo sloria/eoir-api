@@ -41,6 +41,8 @@ logger = structlog.get_logger()
 
 ACIS_URL = "https://acis.eoir.justice.gov/en/"
 
+BROWSER_LOST_ERRORS = (PlaywrightError, RuntimeError)
+
 
 def option_label(nat_name: str, nat_code: str) -> re.Pattern[str]:
     return re.compile(rf"^{re.escape(f'{nat_name} ({nat_code})')}$", re.IGNORECASE)
@@ -117,6 +119,8 @@ class AcisBrowser:
             logger.info("browser stopping")
             try:
                 await self._context.close()
+            except BROWSER_LOST_ERRORS as exc:
+                logger.warning("browser.close_failed", error=str(exc))
             finally:
                 self._context = None
         if self._playwright is not None:
@@ -171,9 +175,9 @@ class AcisBrowser:
                         if attempt >= attempts:
                             raise
                         await asyncio.sleep(2**attempt)
-                    except PlaywrightError as exc:
+                    except BROWSER_LOST_ERRORS as exc:
                         logger.warning("lookup.browser_lost", error=str(exc))
-                        with contextlib.suppress(PlaywrightError):
+                        with contextlib.suppress(*BROWSER_LOST_ERRORS):
                             await self._close()
                         raise UpstreamError("Chrome is no longer available") from exc
                     else:
@@ -228,7 +232,7 @@ class AcisBrowser:
         finally:
             try:
                 await page.close()
-            except PlaywrightError:
+            except BROWSER_LOST_ERRORS:
                 logger.warning("could not close page")
 
         return self._parse(captured)

@@ -227,6 +227,45 @@ async def test_browser_lost_mid_lookup_is_converted_and_discards_the_context(
     assert closed == [True]
 
 
+async def test_dead_driver_transport_is_treated_as_browser_lost(acis_browser):
+    closed = []
+
+    async def fake_once(a_number, nat_code, nat_name):
+        raise RuntimeError(
+            "BrowserContext.new_page: unable to perform operation on "
+            "<WriteUnixTransport closed=True>; the handler is closed"
+        )
+
+    async def fake_close() -> None:
+        closed.append(True)
+
+    acis_browser._close = fake_close
+
+    with pytest.raises(UpstreamError):
+        await lookup_with(acis_browser, fake_once)
+    assert closed == [True]
+
+
+async def test_close_stops_playwright_when_context_close_fails(acis_browser):
+    class Context:
+        async def close(self):
+            raise RuntimeError("the handler is closed")
+
+    class Playwright:
+        stopped = False
+
+        async def stop(self):
+            self.stopped = True
+
+    acis_browser._context = Context()
+    acis_browser._playwright = Playwright()
+
+    await acis_browser.close()
+
+    assert acis_browser._context is None
+    assert acis_browser._playwright is None
+
+
 async def test_browser_lost_is_not_retried_as_a_captcha(acis_browser):
     calls = []
 
