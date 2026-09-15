@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/sloria/eoir-api/compare/acis-browser-v3.0.0...acis-browser-v3.0.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **acis-browser:** recover from dead driver subprocess ([#28](https://github.com/sloria/eoir-api/issues/28)) ([ade421a](https://github.com/sloria/eoir-api/commit/ade421a7f30125164cee3501a0d0c4ddaeae5662))
+
 ## [3.0.0](https://github.com/sloria/eoir-api/compare/acis-browser-v2.0.0...acis-browser-v3.0.0) (2026-09-08)
 
 
