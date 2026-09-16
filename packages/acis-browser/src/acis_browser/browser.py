@@ -86,7 +86,7 @@ class AcisBrowser:
 
     profile_dir: Path
     lookup_timeout: float = 20
-    lookup_attempts: int = 2
+    lookup_attempts: int = 1
 
     last_used: float = field(default=0.0, init=False)
     # Lock to ensure only one lookup or close at a time

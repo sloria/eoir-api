@@ -192,10 +192,11 @@ async def test_lookup_retries_captcha_then_raises(acis_browser, monkeypatch):
         pass
 
     monkeypatch.setattr("acis_browser.browser.asyncio.sleep", no_sleep)
+    acis_browser.lookup_attempts = 2
 
     with pytest.raises(CaptchaError):
         await lookup_with(acis_browser, fake_once)
-    assert len(calls) == acis_browser.lookup_attempts
+    assert len(calls) == 2
 
 
 async def test_lookup_propagates_upstream_error(acis_browser):
