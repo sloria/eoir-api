@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.0.1...acis-browser-v3.1.0) (2026-09-16)
+
+
+### Features
+
+* **acis-browser:** default lookup_attempts to 1 ([#31](https://github.com/sloria/eoir-api/issues/31)) ([430da0f](https://github.com/sloria/eoir-api/commit/430da0f943924cb2b0f0700fb60c67187fc61727))
+
 ## [3.0.1](https://github.com/sloria/eoir-api/compare/acis-browser-v3.0.0...acis-browser-v3.0.1) (2026-09-15)
 
 
