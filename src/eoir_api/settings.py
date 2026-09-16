@@ -24,7 +24,7 @@ class Settings:
     chrome_profile_dir: Annotated[Path, Env("CHROME_PROFILE_DIR")] = DEFAULT_PROFILE_DIR
     lookup_timeout: Annotated[int, Env("LOOKUP_TIMEOUT")] = 20
     """Seconds to wait for a single lookup attempt to produce a response."""
-    lookup_attempts: Annotated[int, Env("LOOKUP_ATTEMPTS")] = 2
+    lookup_attempts: Annotated[int, Env("LOOKUP_ATTEMPTS")] = 1
     """Retry attempts for lookups."""
     browser_idle_timeout: Annotated[int, Env("BROWSER_IDLE_TIMEOUT")] = 900
     """Seconds of inactivity before browser is torn down."""
