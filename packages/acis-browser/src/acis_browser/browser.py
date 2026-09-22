@@ -215,14 +215,18 @@ class AcisBrowser:
 
         try:
             await page.goto(ACIS_URL, wait_until="domcontentloaded", timeout=60_000)
-            await self._wait_for(
+            app_hydrated = await self._wait_for(
                 page,
-                '.ReactModal__Overlay, input[inputmode="numeric"]',
-                "app",
+                "html[data-react-helmet]",
+                "app to hydrate",
+                state="attached",
                 timeout_ms=30_000,
             )
+            if not app_hydrated:
+                raise UpstreamError("ACIS did not finish loading")
             await self._dismiss_modal(page)
             await self._fill_form(page, a_number, nat_code, nat_name)
+            await self._wait_for_captcha(page)
             await page.locator("#btn_submit").click()
             with contextlib.suppress(TimeoutError):
                 async with asyncio.timeout(self.lookup_timeout):
@@ -262,6 +266,20 @@ class AcisBrowser:
         await self._wait_for(
             page, ".ReactModal__Overlay", "consent modal to close", state="detached"
         )
+
+    async def _wait_for_captcha(self, page: Page) -> None:
+        if not await self._wait_for(
+            page,
+            'iframe[src*="hcaptcha.com"]',
+            "captcha widget",
+            state="attached",
+            timeout_ms=15_000,
+        ):
+            return
+        for frame in page.frames:
+            if "hcaptcha.com" in frame.url:
+                with contextlib.suppress(PlaywrightTimeoutError):
+                    await frame.wait_for_load_state("load", timeout=15_000)
 
     async def _fill_form(
         self, page: Page, a_number: str, nat_code: str, nat_name: str
