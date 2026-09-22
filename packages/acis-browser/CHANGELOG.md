@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.1](https://github.com/sloria/eoir-api/compare/acis-browser-v3.1.0...acis-browser-v3.1.1) (2026-09-22)
+
+
+### Bug Fixes
+
+* **acis-browser:** handle slow networks by waiting for app hydration and hCaptcha load ([#37](https://github.com/sloria/eoir-api/issues/37)) ([6ddbe33](https://github.com/sloria/eoir-api/commit/6ddbe331e9a87adb768f78a28b32669eda20e340))
+
 ## [3.1.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.0.1...acis-browser-v3.1.0) (2026-09-16)
 
 
