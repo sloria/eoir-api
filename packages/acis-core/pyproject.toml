@@ -1,6 +1,6 @@
 [project]
 name = "acis-core"
-version = "1.0.0"
+version = "1.1.0"
 description = "Reference data and utilities shared by ACIS clients."
 readme = "README.md"
 authors = [{ name = "Steven Loria", email = "git@stevenloria.com" }]
