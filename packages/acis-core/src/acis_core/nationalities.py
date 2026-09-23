@@ -43,6 +43,12 @@ def _tables() -> tuple[dict[str, Nationality], dict[str, Nationality]]:
     return by_code, by_name
 
 
+def all_nationalities() -> tuple[Nationality, ...]:
+    """Return every nationality ACIS accepts, sorted by code."""
+    by_code, _ = _tables()
+    return tuple(sorted(by_code.values(), key=lambda n: n.code))
+
+
 def get_by_code(code: str) -> Nationality:
     """Look up strictly by code."""
     by_code, _ = _tables()

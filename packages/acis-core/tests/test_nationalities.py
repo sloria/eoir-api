@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from acis_core.nationalities import UnknownNationalityError, get_by_code, resolve
+from acis_core.nationalities import (
+    UnknownNationalityError,
+    all_nationalities,
+    get_by_code,
+    resolve,
+)
 
 
 def test_resolve_by_code():
@@ -37,3 +42,10 @@ def test_get_by_code_is_strict():
     assert get_by_code("MX").name == "MEXICO"
     with pytest.raises(UnknownNationalityError):
         get_by_code("MEXICO")
+
+
+def test_all_nationalities_lists_only_valid_codes_sorted():
+    codes = [n.code for n in all_nationalities()]
+    assert "MX" in codes
+    assert not {"??", "GC", "UR", "XX", "YO"} & set(codes)
+    assert codes == sorted(codes)
