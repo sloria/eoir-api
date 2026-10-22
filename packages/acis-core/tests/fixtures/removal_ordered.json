@@ -1,0 +1,80 @@
+{
+  "Language": "EN",
+  "Data": {
+    "ValidAlienNumber": true,
+    "ReopenExists": true,
+    "AppealFiled": false,
+    "CaseAppealExists": false,
+    "MTR_BIA_Appeal": false,
+    "MTR_BIA_Type": null,
+    "AlienName": "ROE, RIVER",
+    "CaseID": 10000002,
+    "OSC_Date": "2023-01-05T00:00:00",
+    "ClockStatus": "X",
+    "ElapsedDays": "745",
+    "LatestHearingDate": null,
+    "LatestHearingTime": null,
+    "LatestCalType": null,
+    "DocketDate": "2023-01-10T00:00:00",
+    "CaseContactInfo": "26 FEDERAL PLZ 12TH FL RM 1237|NEW YORK, NY 10278|2126026500",
+    "CaseDecisionString": null,
+    "MTRDecisionString": null,
+    "ReopenDecisionString": null,
+    "AppealDecisionString": null,
+    "PendingAtBIA": false
+  },
+  "AlienNumber": "999999998",
+  "Proceeding": {
+    "DateAppealDue": "2026-08-07T00:00:00",
+    "BaseCityCode": "NYC",
+    "Generation": "97",
+    "Subgeneration": null,
+    "HearingLocationCode": "NYC",
+    "HearingLocationAddress": "NEW YORK CITY, NEW YORK|26 FEDERAL PLZ, 12TH FL RM1237|NEW YORK, NY 10278",
+    "ContactAddress": "26 FEDERAL PLZ 12TH FL RM 1237|NEW YORK, NY 10278|2126026500",
+    "CompDate": "2026-07-07T00:00:00",
+    "IJCode": null,
+    "IJName": null,
+    "CaseType": "RMV",
+    "DecisionCode": "X",
+    "OtherComp": "",
+    "OtherReceived1": null,
+    "OtherReceived2": null,
+    "BatteredSpouse": false,
+    "ReleaseInfo": "Y"
+  },
+  "Reopen": {
+    "CompDate": "2023-10-12T00:00:00",
+    "Decision": "G",
+    "MotionReceivedDate": "2023-10-06T00:00:00"
+  },
+  "Appeal": {
+    "AlienBriefDue": null,
+    "AlienBriefFiled": null,
+    "BIADecision": null,
+    "BIADecisionDate": null,
+    "DHSBriefDue": null,
+    "DHSBriefFiled": null,
+    "FiledDate": null,
+    "AppealType": null
+  },
+  "MTR": {
+    "MTRDecision": null,
+    "MTRDecisionDate": null,
+    "MTRAppealFiledDate": null
+  },
+  "Schedule": {
+    "ProceedingID": 0,
+    "AdjDate": null,
+    "IJ_Code": null,
+    "IJ_Name": null,
+    "IJ_WebExURLLink": null,
+    "AdjTime": null,
+    "CalType": null,
+    "ScheduleType": null,
+    "HearingMedium": null,
+    "HearingLocationCode": null,
+    "HearingLocationAddress": null,
+    "ContactAddress": null
+  }
+}
