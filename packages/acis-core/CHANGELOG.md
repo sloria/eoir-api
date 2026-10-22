@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/sloria/eoir-api/compare/acis-core-v1.1.0...acis-core-v1.2.0) (2026-10-22)
+
+
+### Features
+
+* **acis-core:** add Case and diff API for computing case changes ([#50](https://github.com/sloria/eoir-api/issues/50)) ([d911e8c](https://github.com/sloria/eoir-api/commit/d911e8cc5f9bc462507cb80c98445ec07f7e444f))
+
 ## [1.1.0](https://github.com/sloria/eoir-api/compare/acis-core-v1.0.0...acis-core-v1.1.0) (2026-09-23)
 
 
