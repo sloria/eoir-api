@@ -134,6 +134,25 @@ async def test_captcha_exhausted_returns_503(client, browser):
     assert response.headers["Retry-After"] == "300"
 
 
+async def test_all_browsers_in_cooldown_returns_503_with_retry_after(
+    client, browser, clock
+):
+    browser.error = CaptchaError("rejected", reason=CaptchaError.Reason.REJECTED)
+    first = await client.get(f"/cases/{A_NUMBER}?nationality=VE", headers=HEADERS)
+    assert first.status_code == 503
+
+    browser.error = None
+    clock.now += 99.6
+    second = await client.get(f"/cases/{A_NUMBER}?nationality=VE", headers=HEADERS)
+    assert second.status_code == 503
+    assert second.headers["Retry-After"] == "200"
+    assert len(browser.calls) == 1
+
+    clock.now += 200.3
+    third = await client.get(f"/cases/{A_NUMBER}?nationality=VE", headers=HEADERS)
+    assert third.headers["Retry-After"] == "1"
+
+
 async def test_upstream_error_returns_502(client, browser):
     browser.error = UpstreamError("ACIS returned HTTP 500")
     response = await client.get(f"/cases/{A_NUMBER}?nationality=VE", headers=HEADERS)

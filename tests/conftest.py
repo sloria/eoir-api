@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -70,6 +71,7 @@ def settings(tmp_path) -> Settings:
         debug=True,
         api_secret="test-secret",
         chrome_profile_dir=tmp_path / "profile",
+        lookup_interval=0,
         sentry_dsn="",
     )
 
@@ -79,9 +81,22 @@ def browser(master_hearing) -> FakeAcisBrowser:
     return FakeAcisBrowser(payload=master_hearing)
 
 
+@dataclass
+class FakeClock:
+    now: float = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
 @pytest.fixture
-def service(browser, settings) -> CaseService:
-    return CaseService(browser, settings)
+def clock() -> FakeClock:
+    return FakeClock()
+
+
+@pytest.fixture
+def service(browser, settings, clock) -> CaseService:
+    return CaseService({"default": browser}, settings, clock=clock)
 
 
 @pytest.fixture
