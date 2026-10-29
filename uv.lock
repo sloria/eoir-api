@@ -15,7 +15,7 @@ members = [
 
 [[package]]
 name = "acis-browser"
-version = "3.2.0"
+version = "3.3.0"
 source = { editable = "packages/acis-browser" }
 dependencies = [
     { name = "acis-core" },

@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.2.0...acis-browser-v3.3.0) (2026-10-29)
+
+
+### Features
+
+* **acis-browser:** add AcisBrowser.is_running ([#58](https://github.com/sloria/eoir-api/issues/58)) ([84888fe](https://github.com/sloria/eoir-api/commit/84888fe2c5af7b900c3470c43054607bb7c17637))
+
 ## [3.2.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.1.1...acis-browser-v3.2.0) (2026-10-29)
 
 

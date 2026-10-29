@@ -1,6 +1,6 @@
 [project]
 name = "acis-browser"
-version = "3.2.0"
+version = "3.3.0"
 description = "Automated browser to perform ACIS lookups."
 readme = "README.md"
 authors = [{ name = "Steven Loria", email = "git@stevenloria.com" }]
