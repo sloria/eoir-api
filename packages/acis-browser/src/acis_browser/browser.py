@@ -98,6 +98,10 @@ class AcisBrowser:
 
     ##### Lifecycle #####
 
+    @property
+    def is_running(self) -> bool:
+        return self._context is not None
+
     async def start(self) -> None:
         """Launch Chrome. Safe to call repeatedly."""
         if self._context is not None:
