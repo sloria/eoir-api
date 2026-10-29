@@ -27,7 +27,7 @@ from litestar.status_codes import (
     HTTP_502_BAD_GATEWAY,
 )
 
-from eoir_api.exceptions import QueueTimeoutError
+from eoir_api.exceptions import BrowserUnavailableError, QueueTimeoutError
 from eoir_api.guards import require_api_key
 from eoir_api.service import Case, CaseService
 
@@ -46,6 +46,10 @@ class BadGatewayException(HTTPException):
 
 
 ##### Route handlers #####
+
+
+def _retry_after(seconds: float) -> dict[str, str]:
+    return {"Retry-After": str(max(1, round(seconds)))}
 
 
 @get("/healthz", media_type="text/plain", include_in_schema=False, sync_to_thread=False)
@@ -105,15 +109,19 @@ async def get_case(
         raise UnprocessableContentException(str(exc)) from exc
     except QueueTimeoutError as exc:
         log.info("case.queue_full")
-        retry_after = max(1, round(service.avg_lookup_seconds))
         raise TooManyRequestsException(
-            str(exc), headers={"Retry-After": str(retry_after)}
+            str(exc), headers=_retry_after(service.avg_lookup_seconds)
         ) from exc
     except CaptchaError as exc:
         log.warning("case.captcha_error", reason=exc.reason)
         raise ServiceUnavailableException(
             "Blocked by hCaptcha.",
-            headers={"Retry-After": "300"},
+            headers=_retry_after(service.settings.captcha_cooldown),
+        ) from exc
+    except BrowserUnavailableError as exc:
+        log.info("case.browsers_unavailable", retry_after=round(exc.retry_after))
+        raise ServiceUnavailableException(
+            str(exc), headers=_retry_after(exc.retry_after)
         ) from exc
     except UpstreamError as exc:
         log.warning("case.upstream_error", error=str(exc))

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated
 
-from dataclass_settings import Env, load_settings
+from dataclass_settings import Env, Parse, load_settings
 
 from eoir_api.exceptions import ConfigurationError
 
 HERE = Path(__file__).parent
 PROJECT_ROOT = HERE.parent.parent
 DEFAULT_PROFILE_DIR = PROJECT_ROOT / "profile"
+
+
+def parse_list(value: str) -> list[str]:
+    return [v.strip() for v in value.split(",") if v.strip()]
 
 
 @dataclass(kw_only=True)
@@ -22,6 +26,14 @@ class Settings:
 
     # Browser
     chrome_profile_dir: Annotated[Path, Env("CHROME_PROFILE_DIR")] = DEFAULT_PROFILE_DIR
+    chrome_proxies: Annotated[list[str], Env("CHROME_PROXIES"), Parse(parse_list)] = (
+        field(default_factory=list)
+    )
+    """Proxy URLs to run multiple browsers with."""
+    lookup_interval: Annotated[int, Env("LOOKUP_INTERVAL")] = 30
+    """Minimum seconds between lookups on one browser."""
+    captcha_cooldown: Annotated[int, Env("CAPTCHA_COOLDOWN")] = 300
+    """Seconds a browser pauses after a captcha failure."""
     lookup_timeout: Annotated[int, Env("LOOKUP_TIMEOUT")] = 20
     """Seconds to wait for a single lookup attempt to produce a response."""
     lookup_attempts: Annotated[int, Env("LOOKUP_ATTEMPTS")] = 1
