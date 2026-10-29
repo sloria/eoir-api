@@ -112,7 +112,7 @@ async def get_case(
     except CaptchaError as exc:
         log.warning("case.captcha_error", reason=exc.reason)
         raise ServiceUnavailableException(
-            "Could not obtain a captcha token after several attempts. Try again.",
+            "Blocked by hCaptcha.",
             headers={"Retry-After": "300"},
         ) from exc
     except UpstreamError as exc:
