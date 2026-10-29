@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         BrowserContext,
         Page,
         Playwright,
+        ProxySettings,
         Request,
         Response,
     )
@@ -87,6 +88,7 @@ class AcisBrowser:
     profile_dir: Path
     lookup_timeout: float = 20
     lookup_attempts: int = 1
+    proxy: ProxySettings | None = None
 
     last_used: float = field(default=0.0, init=False)
     # Lock to ensure only one lookup or close at a time
@@ -108,6 +110,7 @@ class AcisBrowser:
             channel="chrome",
             headless=False,
             no_viewport=True,
+            proxy=self.proxy,
         )
 
     async def close(self) -> None:
