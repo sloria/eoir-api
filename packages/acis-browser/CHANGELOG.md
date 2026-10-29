@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.1.1...acis-browser-v3.2.0) (2026-10-29)
+
+
+### Features
+
+* **acis-browser:** allow passing a proxy to AcisBrowser ([#54](https://github.com/sloria/eoir-api/issues/54)) ([0bd2d19](https://github.com/sloria/eoir-api/commit/0bd2d19207356f109fe3dcf5821bf3693b09cef8))
+
 ## [3.1.1](https://github.com/sloria/eoir-api/compare/acis-browser-v3.1.0...acis-browser-v3.1.1) (2026-09-22)
 
 
