@@ -31,7 +31,7 @@ from eoir_api.exceptions import BrowserUnavailableError
 from eoir_api.paths import redact_path
 from eoir_api.routes import ROUTE_HANDLERS
 from eoir_api.service import CaseService
-from eoir_api.settings import Settings
+from eoir_api.settings import DIRECT, Settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Mapping
@@ -188,18 +188,15 @@ def create_app(settings: Settings) -> Litestar:
     # XXX: Single browser and service instances to reuse
     # the browser sessions and TTLCache across requests
     profile_dir = settings.chrome_profile_dir
-    browsers = {
-        "default": AcisBrowser(
-            profile_dir=profile_dir,
-            lookup_timeout=settings.lookup_timeout,
-            lookup_attempts=settings.lookup_attempts,
-        )
-    }
-    for i, proxy in enumerate(settings.chrome_proxies, start=1):
-        name = f"proxy{i}"
+    browsers: dict[str, AcisBrowser] = {}
+    for i, spec in enumerate(settings.browsers):
+        direct = spec == DIRECT
+        name = DIRECT if direct else f"proxy{i}"
         browsers[name] = AcisBrowser(
-            profile_dir=profile_dir.with_name(f"{profile_dir.name}-{name}"),
-            proxy={"server": proxy},
+            profile_dir=profile_dir
+            if direct
+            else profile_dir.with_name(f"{profile_dir.name}-{name}"),
+            proxy=None if direct else {"server": spec},
             lookup_timeout=settings.lookup_timeout,
             lookup_attempts=settings.lookup_attempts,
         )

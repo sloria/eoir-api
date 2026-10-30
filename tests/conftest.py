@@ -96,7 +96,7 @@ def clock() -> FakeClock:
 
 @pytest.fixture
 def service(browser, settings, clock) -> CaseService:
-    return CaseService({"default": browser}, settings, clock=clock)
+    return CaseService({"direct": browser}, settings, clock=clock)
 
 
 @pytest.fixture

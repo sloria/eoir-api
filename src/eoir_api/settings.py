@@ -11,6 +11,7 @@ from eoir_api.exceptions import ConfigurationError
 HERE = Path(__file__).parent
 PROJECT_ROOT = HERE.parent.parent
 DEFAULT_PROFILE_DIR = PROJECT_ROOT / "profile"
+DIRECT = "direct"
 
 
 def parse_list(value: str) -> list[str]:
@@ -26,10 +27,10 @@ class Settings:
 
     # Browser
     chrome_profile_dir: Annotated[Path, Env("CHROME_PROFILE_DIR")] = DEFAULT_PROFILE_DIR
-    chrome_proxies: Annotated[list[str], Env("CHROME_PROXIES"), Parse(parse_list)] = (
-        field(default_factory=list)
+    browsers: Annotated[list[str], Env("BROWSERS"), Parse(parse_list)] = field(
+        default_factory=lambda: [DIRECT]
     )
-    """Proxy URLs to run multiple browsers with."""
+    """Browsers to run: ``direct`` or a proxy URL each."""
     lookup_interval: Annotated[int, Env("LOOKUP_INTERVAL")] = 30
     """Minimum seconds between lookups on one browser."""
     captcha_cooldown: Annotated[int, Env("CAPTCHA_COOLDOWN")] = 300
