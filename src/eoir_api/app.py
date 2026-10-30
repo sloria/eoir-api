@@ -187,15 +187,12 @@ def create_app(settings: Settings) -> Litestar:
 
     # XXX: Single browser and service instances to reuse
     # the browser sessions and TTLCache across requests
-    profile_dir = settings.chrome_profile_dir
     browsers: dict[str, AcisBrowser] = {}
     for i, spec in enumerate(settings.browsers):
         direct = spec == DIRECT
         name = DIRECT if direct else f"proxy{i}"
         browsers[name] = AcisBrowser(
-            profile_dir=profile_dir
-            if direct
-            else profile_dir.with_name(f"{profile_dir.name}-{name}"),
+            profile_dir=settings.chrome_profiles_dir / name,
             proxy=None if direct else {"server": spec},
             lookup_timeout=settings.lookup_timeout,
             lookup_attempts=settings.lookup_attempts,

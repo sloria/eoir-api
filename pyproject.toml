@@ -12,6 +12,7 @@ dependencies = [
     "acis-core",
     "dataclass-settings>=0.5.0",
     "litestar[standard,structlog]>=2.14.0",
+    "platformdirs>=4.13.5",
     "sentry-sdk[litestar]>=2.42.1",
     "structlog>=25.1.0",
 ]

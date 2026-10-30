@@ -70,7 +70,7 @@ def settings(tmp_path) -> Settings:
     return Settings(
         debug=True,
         api_secret="test-secret",
-        chrome_profile_dir=tmp_path / "profile",
+        chrome_profiles_dir=tmp_path / "profiles",
         lookup_interval=0,
         sentry_dsn="",
     )

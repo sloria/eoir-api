@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path  # noqa: TC003
 from typing import Annotated
 
 from dataclass_settings import Env, Parse, load_settings
+from platformdirs import user_data_path
 
 from eoir_api.exceptions import ConfigurationError
 
-HERE = Path(__file__).parent
-PROJECT_ROOT = HERE.parent.parent
-DEFAULT_PROFILE_DIR = PROJECT_ROOT / "profile"
+DEFAULT_PROFILES_DIR = user_data_path("eoir-api") / "profiles"
 DIRECT = "direct"
 
 
@@ -26,7 +25,10 @@ class Settings:
     """Secret required in the ``x-api-key`` header."""
 
     # Browser
-    chrome_profile_dir: Annotated[Path, Env("CHROME_PROFILE_DIR")] = DEFAULT_PROFILE_DIR
+    chrome_profiles_dir: Annotated[Path, Env("CHROME_PROFILES_DIR")] = (
+        DEFAULT_PROFILES_DIR
+    )
+    """Parent of one persistent Chrome profile per browser."""
     browsers: Annotated[list[str], Env("BROWSERS"), Parse(parse_list)] = field(
         default_factory=lambda: [DIRECT]
     )
