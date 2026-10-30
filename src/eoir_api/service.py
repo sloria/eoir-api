@@ -126,7 +126,10 @@ class CaseService:
                             a_number, nationality.code, nationality.name
                         )
                 except CaptchaError as exc:
-                    if exc.reason is CaptchaError.Reason.REJECTED:
+                    if exc.reason in (
+                        CaptchaError.Reason.NO_REQUEST,
+                        CaptchaError.Reason.REJECTED,
+                    ):
                         slot.cooldown_until = (
                             self.clock() + self.settings.captcha_cooldown
                         )

@@ -72,7 +72,7 @@ async def test_cache_is_keyed_on_nationality(service, browser):
 
 
 async def test_failures_are_not_cached(service, browser):
-    browser.error = CaptchaError("boom", reason=CaptchaError.Reason.NO_REQUEST)
+    browser.error = CaptchaError("boom", reason=CaptchaError.Reason.NO_RESPONSE)
     with pytest.raises(CaptchaError):
         await service.get_case(A_NUMBER, VE)
 
@@ -112,7 +112,7 @@ async def test_cache_hits_skip_the_queue_guard(service):
 
 
 async def test_pending_is_released_after_a_failure(service, browser):
-    browser.error = CaptchaError("boom", reason=CaptchaError.Reason.NO_REQUEST)
+    browser.error = CaptchaError("boom", reason=CaptchaError.Reason.NO_RESPONSE)
     with pytest.raises(CaptchaError):
         await service.get_case(A_NUMBER, VE)
     assert service.pending == 0
@@ -223,9 +223,25 @@ async def test_estimated_wait_shrinks_with_more_browsers(
     assert two.estimated_wait == 20
 
 
-async def test_mint_failure_does_not_start_a_cooldown(multi_browser_service, browsers):
+async def test_challenge_without_token_starts_a_cooldown(
+    multi_browser_service, browsers
+):
     a, b = browsers.values()
     a.error = CaptchaError("no token", reason=CaptchaError.Reason.NO_REQUEST)
+    await multi_browser_service.get_case(A_NUMBER, VE)
+    assert len(b.calls) == 1
+
+    a.error = None
+    await multi_browser_service.get_case("100000001", VE)
+    assert len(a.calls) == 1
+    assert len(b.calls) == 2
+
+
+async def test_missing_response_does_not_start_a_cooldown(
+    multi_browser_service, browsers
+):
+    a, b = browsers.values()
+    a.error = CaptchaError("timed out", reason=CaptchaError.Reason.NO_RESPONSE)
     await multi_browser_service.get_case(A_NUMBER, VE)
     assert len(b.calls) == 1
 
