@@ -121,9 +121,10 @@ class CaseService:
                     await anyio.sleep(delay)
                 slot.last_started = self.clock()
                 try:
-                    payload = await slot.browser.lookup(
-                        a_number, nationality.code, nationality.name
-                    )
+                    with structlog.contextvars.bound_contextvars(browser=slot.name):
+                        payload = await slot.browser.lookup(
+                            a_number, nationality.code, nationality.name
+                        )
                 except CaptchaError as exc:
                     if exc.reason is CaptchaError.Reason.REJECTED:
                         slot.cooldown_until = (
