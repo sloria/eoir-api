@@ -199,9 +199,6 @@ def create_app(settings: Settings) -> Litestar:
         )
     service = CaseService(browsers, settings)
 
-    async def provide_settings() -> Settings:
-        return settings
-
     async def provide_service() -> CaseService:
         return service
 
@@ -211,10 +208,7 @@ def create_app(settings: Settings) -> Litestar:
         openapi_config=create_openapi_config(),
         plugins=[structlog_plugin],
         lifespan=[make_browser_lifespan(browsers, settings.browser_idle_timeout)],
-        dependencies={
-            "settings": Provide(provide_settings),
-            "service": Provide(provide_service),
-        },
+        dependencies={"service": Provide(provide_service)},
         debug=settings.debug,
     )
 

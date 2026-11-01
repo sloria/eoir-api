@@ -101,9 +101,6 @@ def service(browser, settings, clock) -> CaseService:
 
 @pytest.fixture
 async def client(settings, service) -> AsyncIterator[AsyncTestClient[Litestar]]:
-    async def provide_settings() -> Settings:
-        return settings
-
     async def provide_service() -> CaseService:
         return service
 
@@ -111,9 +108,6 @@ async def client(settings, service) -> AsyncIterator[AsyncTestClient[Litestar]]:
         route_handlers=ROUTE_HANDLERS,
         openapi_config=create_openapi_config(),
         state=State({"settings": settings}),
-        dependencies={
-            "settings": Provide(provide_settings),
-            "service": Provide(provide_service),
-        },
+        dependencies={"service": Provide(provide_service)},
     ) as test_client:
         yield test_client
