@@ -134,6 +134,15 @@ async def test_captcha_exhausted_returns_503(client, browser):
     assert response.headers["Retry-After"] == "300"
 
 
+async def test_captcha_with_a_browser_still_free_returns_short_retry_after(
+    client, browser
+):
+    browser.error = CaptchaError("timed out", reason=CaptchaError.Reason.NO_RESPONSE)
+    response = await client.get(f"/cases/{A_NUMBER}?nationality=VE", headers=HEADERS)
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "1"
+
+
 async def test_all_browsers_in_cooldown_returns_503_with_retry_after(
     client, browser, clock
 ):

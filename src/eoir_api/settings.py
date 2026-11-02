@@ -37,6 +37,8 @@ class Settings:
     """Minimum seconds between lookups on one browser."""
     captcha_cooldown: Annotated[int, Env("CAPTCHA_COOLDOWN")] = 300
     """Seconds a browser pauses after a captcha failure."""
+    lookup_max_browsers: Annotated[int, Env("LOOKUP_MAX_BROWSERS")] = 2
+    """Browsers one request tries before giving up on captcha failures."""
     lookup_timeout: Annotated[int, Env("LOOKUP_TIMEOUT")] = 20
     """Seconds to wait for a single lookup attempt to produce a response."""
     lookup_attempts: Annotated[int, Env("LOOKUP_ATTEMPTS")] = 1
@@ -59,6 +61,8 @@ class Settings:
             raise ConfigurationError("API_SECRET must be set.")
         if self.lookup_attempts < 1:
             raise ConfigurationError("LOOKUP_ATTEMPTS must be at least 1.")
+        if self.lookup_max_browsers < 1:
+            raise ConfigurationError("LOOKUP_MAX_BROWSERS must be at least 1.")
 
     @classmethod
     def from_env(cls) -> Settings:

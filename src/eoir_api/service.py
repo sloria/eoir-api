@@ -8,6 +8,7 @@ import time
 from collections.abc import Callable, Mapping  # noqa: TC003
 from dataclasses import dataclass, field
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 import anyio
 import msgspec
@@ -26,6 +27,9 @@ _EWMA_ALPHA = 0.3
 
 
 class SupportsLookup(Protocol):
+    @property
+    def proxy(self) -> Mapping[str, object] | None: ...
+
     async def lookup(
         self, a_number: str, nat_code: str, nat_name: str
     ) -> dict[str, Any]: ...
@@ -40,6 +44,13 @@ class _BrowserSlot:
     lock: anyio.Lock = field(default_factory=anyio.Lock)
     last_started: float = -math.inf
     cooldown_until: float = -math.inf
+    proxy_host: str | None = field(init=False)
+
+    def __post_init__(self) -> None:
+        proxy = self.browser.proxy
+        self.proxy_host = (
+            urlsplit(str(proxy["server"])).hostname if proxy is not None else None
+        )
 
     def in_cooldown(self, now: float) -> bool:
         return now < self.cooldown_until
@@ -83,35 +94,49 @@ class CaseService:
         per_lookup = max(self.avg_lookup_seconds, self.settings.lookup_interval)
         return self._pending * per_lookup / max(1, available)
 
-    def _unavailable(self, now: float) -> BrowserUnavailableError:
-        cooldown_ends = min(s.cooldown_until for s in self._slots if s.in_cooldown(now))
+    @property
+    def retry_after(self) -> float:
+        """Seconds until a browser is out of captcha cooldown; 0 if one is now."""
+        cooldown_ends = min(slot.cooldown_until for slot in self._slots)
+        return max(0, cooldown_ends - self.clock())
+
+    def _unavailable(self) -> BrowserUnavailableError:
         return BrowserUnavailableError(
-            "No browser available for lookup.", retry_after=cooldown_ends - now
+            "No browser available for lookup.", retry_after=self.retry_after
         )
 
     def _pick_browser(self, exclude: set[_BrowserSlot]) -> _BrowserSlot:
         now = self.clock()
+        tried_hosts = {slot.proxy_host for slot in exclude}
         candidates = [
             slot
             for slot in self._slots
             if slot not in exclude and not slot.in_cooldown(now)
         ]
         if not candidates:
-            raise self._unavailable(now)
-        # unlocked first, then least recently used
-        return min(candidates, key=lambda slot: (slot.lock.locked(), slot.last_started))
+            raise self._unavailable()
+        # untried host first, then unlocked, then least recently used
+        return min(
+            candidates,
+            key=lambda slot: (
+                slot.proxy_host in tried_hosts,
+                slot.lock.locked(),
+                slot.last_started,
+            ),
+        )
 
     async def _lookup(
         self, a_number: str, nationality: Nationality
     ) -> tuple[dict[str, Any], str, float]:
         tried: set[_BrowserSlot] = set()
+        max_browsers = min(self.settings.lookup_max_browsers, len(self._slots))
         while True:
             slot = self._pick_browser(tried)
-            tried.add(slot)
             async with slot.lock:
                 now = self.clock()
                 if slot.in_cooldown(now):  # cooled down while waiting for the lock
                     continue
+                tried.add(slot)
                 delay = self.settings.lookup_interval - (now - slot.last_started)
                 if delay > 0:
                     if delay >= 1:
@@ -138,7 +163,8 @@ class CaseService:
                             browser=slot.name,
                             seconds=self.settings.captcha_cooldown,
                         )
-                    if len(tried) == len(self._slots):
+                    if len(tried) >= max_browsers:
+                        logger.warning("lookup.capped", browsers=len(tried))
                         raise
                     continue
                 finally:
@@ -172,7 +198,7 @@ class CaseService:
 
         now = self.clock()
         if all(slot.in_cooldown(now) for slot in self._slots):
-            raise self._unavailable(now)
+            raise self._unavailable()
         wait = self.estimated_wait
         if wait > self.settings.max_queue_wait:
             raise QueueTimeoutError(

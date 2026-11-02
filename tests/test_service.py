@@ -293,3 +293,48 @@ async def test_lookup_waiting_on_a_lock_skips_a_browser_that_entered_cooldown(
         release.set()
 
     assert outcomes == [CaptchaError, BrowserUnavailableError]
+
+
+##### Browsers per lookup #####
+
+
+@pytest.mark.parametrize(
+    "reason", [CaptchaError.Reason.REJECTED, CaptchaError.Reason.NO_RESPONSE]
+)
+async def test_lookup_gives_up_after_max_browsers_fail_captcha(
+    master_hearing, settings, clock, reason
+):
+    a, b, c = (FakeAcisBrowser(payload=master_hearing) for _ in "abc")
+    service = CaseService({"a": a, "b": b, "c": c}, settings, clock=clock)
+    a.error = b.error = c.error = CaptchaError("boom", reason=reason)
+    with pytest.raises(CaptchaError):
+        await service.get_case(A_NUMBER, VE)
+    assert [len(a.calls), len(b.calls), len(c.calls)] == [1, 1, 0]
+    assert service.retry_after == 0
+
+
+async def test_retry_prefers_a_browser_on_another_host(master_hearing, settings, clock):
+    a, b, c = (
+        FakeAcisBrowser(payload=master_hearing, proxy=proxy)
+        for proxy in (
+            "socks5://host-a:1081",
+            "socks5://host-a:1082",
+            "socks5://host-b:1081",
+        )
+    )
+    service = CaseService({"a": a, "b": b, "c": c}, settings, clock=clock)
+    a.error = CAPTCHA
+    await service.get_case(A_NUMBER, VE)
+    assert len(b.calls) == 0
+    assert len(c.calls) == 1
+
+
+async def test_retry_falls_back_to_the_same_host(master_hearing, settings, clock):
+    a, b = (
+        FakeAcisBrowser(payload=master_hearing, proxy="socks5://host-a:1081")
+        for _ in "ab"
+    )
+    service = CaseService({"a": a, "b": b}, settings, clock=clock)
+    a.error = CAPTCHA
+    await service.get_case(A_NUMBER, VE)
+    assert len(b.calls) == 1

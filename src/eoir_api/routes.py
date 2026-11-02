@@ -116,7 +116,7 @@ async def get_case(
         log.warning("case.captcha_error", reason=exc.reason)
         raise ServiceUnavailableException(
             "Blocked by hCaptcha.",
-            headers=_retry_after(service.settings.captcha_cooldown),
+            headers=_retry_after(service.retry_after),
         ) from exc
     except BrowserUnavailableError as exc:
         log.info("case.browsers_unavailable", retry_after=round(exc.retry_after))
