@@ -207,12 +207,16 @@ class CaseService:
             )
 
         self._pending += 1
+        started = self.clock()
         logger.info("lookup.start", nat_code=nationality.code, pending=self._pending)
         try:
             payload, browser_name, duration = await self._lookup(a_number, nationality)
         except Exception as exc:
             logger.warning(
-                "lookup.failed", nat_code=nationality.code, error=type(exc).__name__
+                "lookup.failed",
+                nat_code=nationality.code,
+                error=type(exc).__name__,
+                elapsed=round(self.clock() - started, 1),
             )
             raise
         finally:
@@ -225,6 +229,7 @@ class CaseService:
             nat_code=nationality.code,
             browser=browser_name,
             duration=round(duration, 1),
+            elapsed=round(self.clock() - started, 1),
         )
         return Case(
             a_number=a_number,
