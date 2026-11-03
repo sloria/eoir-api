@@ -5,9 +5,10 @@ import logging
 import sys
 import time
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import anyio
+import msgspec
 import sentry_sdk
 import structlog
 from acis_browser import AcisBrowser, CaptchaError
@@ -31,10 +32,12 @@ from eoir_api.exceptions import BrowserUnavailableError
 from eoir_api.paths import redact_path
 from eoir_api.routes import ROUTE_HANDLERS
 from eoir_api.service import CaseService
-from eoir_api.settings import DIRECT, Settings
+from eoir_api.settings import Proxy, Settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Mapping
+
+    from patchright.async_api import ProxySettings
 
 logger = structlog.get_logger()
 
@@ -144,14 +147,21 @@ def _redact_path_processor(_logger: Any, _method: Any, event_dict: Any) -> Any:
     return event_dict
 
 
+def _proxy_settings(proxy: Proxy | None) -> ProxySettings | None:
+    if proxy is None:
+        return None
+    fields = msgspec.structs.asdict(proxy)
+    return cast("ProxySettings", {k: v for k, v in fields.items() if v is not None})
+
+
 def create_app(settings: Settings) -> Litestar:
-    if settings.sentry_dsn:
+    if settings.sentry.dsn:
         sentry_sdk.init(
-            settings.sentry_dsn,
+            settings.sentry.dsn,
             include_local_variables=False,
             send_default_pii=False,
             before_send=_scrub_sentry_event,
-            environment=settings.sentry_env,
+            environment=settings.sentry.environment or None,
             integrations=[LitestarIntegration()],
         )
 
@@ -187,16 +197,15 @@ def create_app(settings: Settings) -> Litestar:
 
     # XXX: Single browser and service instances to reuse
     # the browser sessions and TTLCache across requests
-    browsers: dict[str, AcisBrowser] = {}
-    for i, spec in enumerate(settings.browsers):
-        direct = spec == DIRECT
-        name = DIRECT if direct else f"proxy{i}"
-        browsers[name] = AcisBrowser(
-            profile_dir=settings.chrome_profiles_dir / name,
-            proxy=None if direct else {"server": spec},
-            lookup_timeout=settings.lookup_timeout,
-            lookup_attempts=settings.lookup_attempts,
+    browsers = {
+        b.name: AcisBrowser(
+            profile_dir=settings.chrome.profiles_dir / b.name,
+            proxy=_proxy_settings(b.proxy),
+            lookup_timeout=settings.lookup.timeout,
+            lookup_attempts=settings.lookup.attempts,
         )
+        for b in settings.browsers
+    }
     service = CaseService(browsers, settings)
 
     async def provide_service() -> CaseService:
@@ -207,7 +216,7 @@ def create_app(settings: Settings) -> Litestar:
         state=State({"settings": settings}),
         openapi_config=create_openapi_config(),
         plugins=[structlog_plugin],
-        lifespan=[make_browser_lifespan(browsers, settings.browser_idle_timeout)],
+        lifespan=[make_browser_lifespan(browsers, settings.chrome.idle_timeout)],
         dependencies={"service": Provide(provide_service)},
         debug=settings.debug,
     )

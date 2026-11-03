@@ -62,8 +62,10 @@ Initial setup:
 
 ```
 mise setup
-# creates .env, which should be edited to set API_SECRET
+# creates config.toml from config.example.toml; set api_secret there or export API_SECRET
 ```
+
+All settings are documented in [config.example.toml](config.example.toml).
 
 Run the dev server:
 
@@ -89,10 +91,8 @@ EOIR_TEST_A_NUMBER=... EOIR_TEST_NATIONALITY=... mise run test:live
 
 Must run on a host machine with Google Chrome (cannot use headless).
 
-Run the server with:
-
-```
-mise start
+```bash
+uv run --frozen --no-dev eoir-api serve --config /path/to/config.toml
 ```
 
 ## License

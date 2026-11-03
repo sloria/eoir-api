@@ -79,7 +79,9 @@ class CaseService:
         # Not a dataclass field: msgspec resolves field annotations when Litestar
         # builds the signature model, and it cannot evaluate TTLCache's PEP 695 type
         # parameter.
-        self._cache: TTLCache[dict[str, Any]] = TTLCache(ttl=self.settings.cache_ttl)
+        self._cache: TTLCache[dict[str, Any]] = TTLCache(
+            ttl=self.settings.lookup.cache_ttl
+        )
         self._slots = [_BrowserSlot(name, b) for name, b in self.browsers.items()]
 
     @property
@@ -91,7 +93,7 @@ class CaseService:
         """Projected seconds before a newly-arriving request would start."""
         now = self.clock()
         available = sum(not slot.in_cooldown(now) for slot in self._slots)
-        per_lookup = max(self.avg_lookup_seconds, self.settings.lookup_interval)
+        per_lookup = max(self.avg_lookup_seconds, self.settings.lookup.interval)
         return self._pending * per_lookup / max(1, available)
 
     @property
@@ -129,7 +131,7 @@ class CaseService:
         self, a_number: str, nationality: Nationality
     ) -> tuple[dict[str, Any], str, float]:
         tried: set[_BrowserSlot] = set()
-        max_browsers = min(self.settings.lookup_max_browsers, len(self._slots))
+        max_browsers = min(self.settings.lookup.max_browsers, len(self._slots))
         while True:
             slot = self._pick_browser(tried)
             async with slot.lock:
@@ -137,7 +139,7 @@ class CaseService:
                 if slot.in_cooldown(now):  # cooled down while waiting for the lock
                     continue
                 tried.add(slot)
-                delay = self.settings.lookup_interval - (now - slot.last_started)
+                delay = self.settings.lookup.interval - (now - slot.last_started)
                 if delay > 0:
                     if delay >= 1:
                         logger.info(
@@ -156,12 +158,12 @@ class CaseService:
                         CaptchaError.Reason.REJECTED,
                     ):
                         slot.cooldown_until = (
-                            self.clock() + self.settings.captcha_cooldown
+                            self.clock() + self.settings.lookup.captcha_cooldown
                         )
                         logger.warning(
                             "lookup.cooldown",
                             browser=slot.name,
-                            seconds=self.settings.captcha_cooldown,
+                            seconds=self.settings.lookup.captcha_cooldown,
                         )
                     if len(tried) >= max_browsers:
                         logger.warning("lookup.capped", browsers=len(tried))
@@ -200,10 +202,10 @@ class CaseService:
         if all(slot.in_cooldown(now) for slot in self._slots):
             raise self._unavailable()
         wait = self.estimated_wait
-        if wait > self.settings.max_queue_wait:
+        if wait > self.settings.lookup.max_queue_wait:
             raise QueueTimeoutError(
                 f"Estimated wait {wait:.0f}s exceeds "
-                f"{self.settings.max_queue_wait}s; retry shortly"
+                f"{self.settings.lookup.max_queue_wait}s; retry shortly"
             )
 
         self._pending += 1

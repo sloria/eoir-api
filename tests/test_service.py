@@ -45,7 +45,7 @@ async def test_cache_expires(service, browser, time_machine, settings):
     await service.get_case(A_NUMBER, VE)
     time_machine.move_to(
         dt.datetime(2026, 7, 25, 12, 0, tzinfo=dt.UTC)
-        + dt.timedelta(seconds=settings.cache_ttl + 1),
+        + dt.timedelta(seconds=settings.lookup.cache_ttl + 1),
         tick=False,
     )
     result = await service.get_case(A_NUMBER, VE)
@@ -169,7 +169,7 @@ async def test_browser_is_used_again_after_cooldown(
     await multi_browser_service.get_case(A_NUMBER, VE)
     a.error = None
 
-    clock.now += settings.captcha_cooldown + 1
+    clock.now += settings.lookup.captcha_cooldown + 1
     await multi_browser_service.get_case("100000001", VE)
     assert len(a.calls) == 2
 
@@ -193,7 +193,7 @@ async def test_lookup_interval_applies_per_browser(
     multi_browser_service, settings, clock, monkeypatch
 ):
     service = multi_browser_service
-    settings.lookup_interval = 30
+    settings.lookup.interval = 30
     sleeps: list[float] = []
 
     async def fake_sleep(delay: float) -> None:
