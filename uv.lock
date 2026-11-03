@@ -76,19 +76,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dataclass-settings"
-version = "0.8.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "type-lens" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/13/54/51ae092c1f696644c066c2d593d6b4bd7f646018e998ced3bf6f5d47d3c6/dataclass_settings-0.8.0.tar.gz", hash = "sha256:2d8ca9378eebd981cbea9f5eeff74c89fca3ded861c1d8d756b80179446fcaaf", size = 98512, upload-time = "2026-10-02T21:24:39.448Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/da/6d1ce8d11836ad20b7eba9d941d1b14f62d67c430607a803fb69128b990a/dataclass_settings-0.8.0-py3-none-any.whl", hash = "sha256:2ea56bff991de4d1b8306bfe531733ad158646e6c289929a7a807c4a68184d8b", size = 20447, upload-time = "2026-10-02T21:24:38.098Z" },
-]
-
-[[package]]
 name = "editorconfig"
 version = "0.17.1"
 source = { registry = "https://pypi.org/simple" }
@@ -104,11 +91,12 @@ source = { editable = "." }
 dependencies = [
     { name = "acis-browser" },
     { name = "acis-core" },
-    { name = "dataclass-settings" },
+    { name = "click" },
     { name = "litestar", extra = ["standard", "structlog"] },
     { name = "platformdirs" },
     { name = "sentry-sdk", extra = ["litestar"] },
     { name = "structlog" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -124,11 +112,12 @@ dev = [
 requires-dist = [
     { name = "acis-browser", editable = "packages/acis-browser" },
     { name = "acis-core", editable = "packages/acis-core" },
-    { name = "dataclass-settings", specifier = ">=0.5.0" },
+    { name = "click", specifier = ">=8.5.0" },
     { name = "litestar", extras = ["standard", "structlog"], specifier = ">=2.14.0" },
     { name = "platformdirs", specifier = ">=4.13.5" },
     { name = "sentry-sdk", extras = ["litestar"], specifier = ">=2.42.1" },
     { name = "structlog", specifier = ">=25.1.0" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -915,18 +904,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/a8/2a/c74fd5fc3fb5b046fe06a9067cabf5417b73e28249dc9af90ef72700f8fd/ty-0.0.90-py3-none-win32.whl", hash = "sha256:4c46a79caf84c4da0f7293e16bd769bd467c7cbc38015cac7608ab4e5ec8ba9c", size = 13235434, upload-time = "2026-10-20T14:25:10.545Z" },
     { url = "https://files.pythonhosted.org/packages/d2/54/be5cd6b17d8087a5e4c26892311c07e39d42b66c925b0f06cfc51a9ce83b/ty-0.0.90-py3-none-win_amd64.whl", hash = "sha256:8d77c16d20201b7a07ccaafb610eaf60488783dbba9865c4f9182e584f1426f8", size = 13855668, upload-time = "2026-10-20T14:25:13.648Z" },
     { url = "https://files.pythonhosted.org/packages/33/68/6dea089a897e8b314504eecc2633de3c8fe14f70e71a35606d14a2ba169e/ty-0.0.90-py3-none-win_arm64.whl", hash = "sha256:bfb63e74eeedb0a29d49cf58d611c540bfdfc0975dfce26efc6575bcf439208d", size = 13330853, upload-time = "2026-10-20T14:25:16.642Z" },
-]
-
-[[package]]
-name = "type-lens"
-version = "0.2.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f8/55/8846322acedf26cafb4a66dd23fdca6bc73cb3f8c0029040a9b96f5aa0dd/type_lens-0.2.6.tar.gz", hash = "sha256:5d46ab3bc2dfafc174cad702eccb4418c31e38e258e87945a19d86ebc204d08b", size = 362277, upload-time = "2025-10-20T20:08:28.07Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/c5/30de077e06f7ffc3fe21d45ce26b8088816227b678a7157f6b9e080ff2db/type_lens-0.2.6-py3-none-any.whl", hash = "sha256:aade6beb3eca337c90d1b627b509768473bbd591e233ed6b57fb93ec2a01bca6", size = 14451, upload-time = "2025-10-20T20:08:26.936Z" },
 ]
 
 [[package]]

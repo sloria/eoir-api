@@ -1,0 +1,46 @@
+# eoir-config. Values shown are defaults.
+
+# Shared secret required in the `x-api-key` header. Generate with: openssl rand -hex 32
+api_secret = { env = "API_SECRET" }
+# Litestar debug mode
+debug = false
+
+[server]
+host = "127.0.0.1"
+port = 8001
+
+[chrome]
+# Where to store browser profiles.
+# Default: platform user data dir, e.g. on macOS:
+# profiles_dir = "~/Library/Application Support/eoir-api/profiles"
+# Seconds of inactivity before Chrome is torn down
+idle_timeout = 900
+
+[lookup]
+# Minimum seconds between lookups on a single browser
+interval = 30
+# Seconds to wait for one lookup attempt to produce a response
+timeout = 20
+# Attempts per browser before giving up on a lookup (>= 1)
+attempts = 1
+# Browsers one request tries before giving up on captcha failures (>= 1)
+max_browsers = 2
+# Seconds a browser pauses after a captcha failure
+captcha_cooldown = 300
+# Seconds to cache a successful lookup. Absorbs consumer retries and duplicate calls.
+cache_ttl = 10800
+# Beyond this estimated queue wait (seconds), return 429
+max_queue_wait = 30
+
+# One table per browser. Omit all to run a single browser named "default".
+# `name` determines the profile dir name.
+[[browsers]]
+name = "default"
+# Omit `proxy` to connect directly. username / password are optional.
+# proxy = { server = "socks5://127.0.0.1:1080", username = { env = "PROXY_USER" }, password = { env = "PROXY_PASS" } }
+
+[sentry]
+# Sentry DSN; empty disables Sentry. e.g. { env = "SENTRY_DSN" }
+dsn = ""
+# Sentry environment; empty uses Sentry's default
+environment = ""

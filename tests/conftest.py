@@ -14,7 +14,7 @@ from litestar.testing import AsyncTestClient, create_async_test_client
 
 from eoir_api.app import ROUTE_HANDLERS, create_openapi_config
 from eoir_api.service import CaseService
-from eoir_api.settings import Settings
+from eoir_api.settings import Chrome, Lookup, Secret, Settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -72,10 +72,9 @@ class FakeAcisBrowser:
 def settings(tmp_path) -> Settings:
     return Settings(
         debug=True,
-        api_secret="test-secret",
-        chrome_profiles_dir=tmp_path / "profiles",
-        lookup_interval=0,
-        sentry_dsn="",
+        api_secret=Secret("test-secret"),
+        chrome=Chrome(profiles_dir=tmp_path / "profiles"),
+        lookup=Lookup(interval=0),
     )
 
 
