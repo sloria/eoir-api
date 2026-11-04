@@ -12,6 +12,8 @@ class CaptchaError(AcisError):
     class Reason(StrEnum):
         NO_REQUEST = auto()
         """Form was submitted but no case request followed."""
+        CHALLENGE = auto()
+        """hCaptcha showed a visible challenge instead of minting a token."""
         NO_RESPONSE = auto()
         """Case request went out but nothing came back."""
         REJECTED = auto()
