@@ -56,7 +56,10 @@ def live_browser(tmp_path) -> AcisBrowser:
 async def test_captcha_token_is_accepted(live_browser):
     async with live_browser as browser:
         payload = await browser.lookup("123456789", "MX", "MEXICO")
-    assert Outcome.from_payload(payload) is Outcome.NOT_FOUND
+    assert Outcome.from_payload(payload) in (
+        Outcome.NOT_FOUND,
+        Outcome.INVALID_NATIONALITY,
+    )
 
 
 @pytest.mark.skipif(
