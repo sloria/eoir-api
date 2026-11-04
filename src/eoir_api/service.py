@@ -8,7 +8,6 @@ import time
 from collections.abc import Callable, Mapping  # noqa: TC003
 from dataclasses import dataclass, field
 from typing import Any, Protocol
-from urllib.parse import urlsplit
 
 import anyio
 import msgspec
@@ -27,9 +26,6 @@ _EWMA_ALPHA = 0.3
 
 
 class SupportsLookup(Protocol):
-    @property
-    def proxy(self) -> Mapping[str, object] | None: ...
-
     async def lookup(
         self, a_number: str, nat_code: str, nat_name: str
     ) -> dict[str, Any]: ...
@@ -41,16 +37,10 @@ class _BrowserSlot:
 
     name: str
     browser: SupportsLookup
+    group: str | None
     lock: anyio.Lock = field(default_factory=anyio.Lock)
     last_started: float = -math.inf
     cooldown_until: float = -math.inf
-    proxy_host: str | None = field(init=False)
-
-    def __post_init__(self) -> None:
-        proxy = self.browser.proxy
-        self.proxy_host = (
-            urlsplit(str(proxy["server"])).hostname if proxy is not None else None
-        )
 
     def in_cooldown(self, now: float) -> bool:
         return now < self.cooldown_until
@@ -82,7 +72,10 @@ class CaseService:
         self._cache: TTLCache[dict[str, Any]] = TTLCache(
             ttl=self.settings.lookup.cache_ttl
         )
-        self._slots = [_BrowserSlot(name, b) for name, b in self.browsers.items()]
+        groups = {b.name: b.group for b in self.settings.browsers}
+        self._slots = [
+            _BrowserSlot(name, b, groups.get(name)) for name, b in self.browsers.items()
+        ]
 
     @property
     def pending(self) -> int:
@@ -109,7 +102,7 @@ class CaseService:
 
     def _pick_browser(self, exclude: set[_BrowserSlot]) -> _BrowserSlot:
         now = self.clock()
-        tried_hosts = {slot.proxy_host for slot in exclude}
+        tried_groups = {slot.group for slot in exclude} - {None}
         candidates = [
             slot
             for slot in self._slots
@@ -117,11 +110,11 @@ class CaseService:
         ]
         if not candidates:
             raise self._unavailable()
-        # untried host first, then unlocked, then least recently used
+        # untried group first, then unlocked, then least recently used
         return min(
             candidates,
             key=lambda slot: (
-                slot.proxy_host in tried_hosts,
+                slot.group in tried_groups,
                 slot.lock.locked(),
                 slot.last_started,
             ),
@@ -129,7 +122,7 @@ class CaseService:
 
     async def _lookup(
         self, a_number: str, nationality: Nationality
-    ) -> tuple[dict[str, Any], str, float]:
+    ) -> tuple[dict[str, Any], _BrowserSlot, float]:
         tried: set[_BrowserSlot] = set()
         max_browsers = min(self.settings.lookup.max_browsers, len(self._slots))
         while True:
@@ -143,12 +136,17 @@ class CaseService:
                 if delay > 0:
                     if delay >= 1:
                         logger.info(
-                            "lookup.pacing", browser=slot.name, delay=round(delay)
+                            "lookup.pacing",
+                            browser=slot.name,
+                            group=slot.group,
+                            delay=round(delay),
                         )
                     await anyio.sleep(delay)
                 slot.last_started = self.clock()
                 try:
-                    with structlog.contextvars.bound_contextvars(browser=slot.name):
+                    with structlog.contextvars.bound_contextvars(
+                        browser=slot.name, group=slot.group
+                    ):
                         payload = await slot.browser.lookup(
                             a_number, nationality.code, nationality.name
                         )
@@ -160,6 +158,7 @@ class CaseService:
                         logger.warning(
                             "lookup.cooldown",
                             browser=slot.name,
+                            group=slot.group,
                             seconds=self.settings.lookup.captcha_cooldown,
                         )
                     if len(tried) >= max_browsers:
@@ -172,7 +171,7 @@ class CaseService:
                         _EWMA_ALPHA * duration
                         + (1 - _EWMA_ALPHA) * self.avg_lookup_seconds
                     )
-                return payload, slot.name, duration
+                return payload, slot, duration
 
     async def get_case(
         self, a_number: str, nationality: Nationality, *, refresh: bool = False
@@ -209,7 +208,7 @@ class CaseService:
         started = self.clock()
         logger.info("lookup.start", nat_code=nationality.code, pending=self._pending)
         try:
-            payload, browser_name, duration = await self._lookup(a_number, nationality)
+            payload, slot, duration = await self._lookup(a_number, nationality)
         except Exception as exc:
             logger.warning(
                 "lookup.failed",
@@ -226,7 +225,8 @@ class CaseService:
         logger.info(
             "lookup.success",
             nat_code=nationality.code,
-            browser=browser_name,
+            browser=slot.name,
+            group=slot.group,
             duration=round(duration, 1),
             elapsed=round(self.clock() - started, 1),
         )

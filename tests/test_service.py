@@ -10,6 +10,7 @@ from acis_core.nationalities import resolve
 
 from eoir_api.exceptions import BrowserUnavailableError, QueueTimeoutError
 from eoir_api.service import CaseService
+from eoir_api.settings import Browser, Proxy
 
 from .conftest import FakeAcisBrowser
 
@@ -316,15 +317,23 @@ async def test_lookup_gives_up_after_max_browsers_fail_captcha(
     assert service.retry_after == 0
 
 
-async def test_retry_prefers_a_browser_on_another_host(master_hearing, settings, clock):
-    a, b, c = (
-        FakeAcisBrowser(payload=master_hearing, proxy=proxy)
-        for proxy in (
-            "socks5://host-a:1081",
-            "socks5://host-a:1082",
-            "socks5://host-b:1081",
-        )
+def configure_browsers(settings, **browsers: tuple[str, str | None]) -> None:
+    settings.browsers = [
+        Browser(name=name, proxy=Proxy(server=server), group=group)
+        for name, (server, group) in browsers.items()
+    ]
+
+
+async def test_retry_prefers_a_browser_in_another_group(
+    master_hearing, settings, clock
+):
+    configure_browsers(
+        settings,
+        a=("socks5://host-a:1081", "provider-a"),
+        b=("socks5://host-b:1081", "provider-a"),
+        c=("socks5://host-c:1081", "provider-b"),
     )
+    a, b, c = (FakeAcisBrowser(payload=master_hearing) for _ in "abc")
     service = CaseService({"a": a, "b": b, "c": c}, settings, clock=clock)
     a.error = CAPTCHA
     await service.get_case(A_NUMBER, VE)
@@ -332,11 +341,13 @@ async def test_retry_prefers_a_browser_on_another_host(master_hearing, settings,
     assert len(c.calls) == 1
 
 
-async def test_retry_falls_back_to_the_same_host(master_hearing, settings, clock):
-    a, b = (
-        FakeAcisBrowser(payload=master_hearing, proxy="socks5://host-a:1081")
-        for _ in "ab"
+async def test_retry_falls_back_to_the_same_group(master_hearing, settings, clock):
+    configure_browsers(
+        settings,
+        a=("socks5://host-a:1081", "provider-a"),
+        b=("socks5://host-b:1081", "provider-a"),
     )
+    a, b = (FakeAcisBrowser(payload=master_hearing) for _ in "ab")
     service = CaseService({"a": a, "b": b}, settings, clock=clock)
     a.error = CAPTCHA
     await service.get_case(A_NUMBER, VE)
