@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.3.0...acis-browser-v3.4.0) (2026-11-04)
+
+
+### Features
+
+* **acis-browser:** return error early when captcha is encountered ([#63](https://github.com/sloria/eoir-api/issues/63)) ([e5a5f20](https://github.com/sloria/eoir-api/commit/e5a5f20ad7cc91f852b07099be0e62c423833d31))
+
 ## [3.3.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.2.0...acis-browser-v3.3.0) (2026-10-29)
 
 
