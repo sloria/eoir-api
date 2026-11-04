@@ -73,6 +73,7 @@ class Browser(_Base):
     # Also the profile dir name, so it must be a safe single path segment
     name: Annotated[str, msgspec.Meta(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")]
     proxy: Proxy | None = None
+    group: Annotated[str, msgspec.Meta(min_length=1)] | None = None
 
 
 class Settings(_Base):

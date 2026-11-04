@@ -48,16 +48,16 @@ interval = 5
 name = "direct"
 
 [[browsers]]
-name = "araw-1"
-proxy = { server = "socks5://araw:1081", username = "u", password = "p" }
+name = "proxied-1"
+proxy = { server = "socks5://host-a:1081", username = "u", password = "p" }
 """)
     )
     assert settings.lookup.interval == 5
-    araw = settings.browsers[1]
-    assert araw.name == "araw-1"
-    assert araw.proxy is not None
-    assert araw.proxy.server == "socks5://araw:1081"
-    assert araw.proxy.password == "p"
+    proxied = settings.browsers[1]
+    assert proxied.name == "proxied-1"
+    assert proxied.proxy is not None
+    assert proxied.proxy.server == "socks5://host-a:1081"
+    assert proxied.proxy.password == "p"
 
 
 def test_load_resolves_env_ref(write_config, monkeypatch):

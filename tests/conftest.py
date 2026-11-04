@@ -49,11 +49,8 @@ def master_hearing() -> dict[str, Any]:
 
 
 class FakeAcisBrowser:
-    def __init__(
-        self, payload: dict[str, Any] | None = None, proxy: str | None = None
-    ) -> None:
+    def __init__(self, payload: dict[str, Any] | None = None) -> None:
         self.payload = payload
-        self.proxy = {"server": proxy} if proxy else None
         self.error: Exception | None = None
         self.calls: list[tuple[str, str, str]] = []
 

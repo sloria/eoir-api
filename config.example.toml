@@ -38,6 +38,8 @@ max_queue_wait = 30
 name = "default"
 # Omit `proxy` to connect directly. username / password are optional.
 # proxy = { server = "socks5://127.0.0.1:1080", username = { env = "PROXY_USER" }, password = { env = "PROXY_PASS" } }
+# Optional. Retries after a captcha prefer another group.
+# group = "provider-a"
 
 [sentry]
 # Sentry DSN; empty disables Sentry. e.g. { env = "SENTRY_DSN" }
