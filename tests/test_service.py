@@ -223,11 +223,14 @@ async def test_estimated_wait_shrinks_with_more_browsers(
     assert two.estimated_wait == 20
 
 
+@pytest.mark.parametrize(
+    "reason", [CaptchaError.Reason.NO_REQUEST, CaptchaError.Reason.CHALLENGE]
+)
 async def test_challenge_without_token_starts_a_cooldown(
-    multi_browser_service, browsers
+    multi_browser_service, browsers, reason
 ):
     a, b = browsers.values()
-    a.error = CaptchaError("no token", reason=CaptchaError.Reason.NO_REQUEST)
+    a.error = CaptchaError("no token", reason=reason)
     await multi_browser_service.get_case(A_NUMBER, VE)
     assert len(b.calls) == 1
 

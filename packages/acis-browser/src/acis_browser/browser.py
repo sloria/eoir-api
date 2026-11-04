@@ -41,6 +41,8 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 ACIS_URL = "https://acis.eoir.justice.gov/en/"
+HCAPTCHA_IFRAME = 'iframe[src*="hcaptcha.com"]'
+CHALLENGE_IFRAME = f'{HCAPTCHA_IFRAME}[src*="frame=challenge"]'
 
 BROWSER_LOST_ERRORS = (PlaywrightError, RuntimeError)
 
@@ -76,6 +78,7 @@ def raise_for_outcome(payload: dict[str, Any]) -> None:
 @dataclass
 class _Capture:
     requested: bool = False
+    challenged: bool = False
     status: int = 0
     body: str | None = None
     received: asyncio.Event = field(default_factory=asyncio.Event)
@@ -235,9 +238,7 @@ class AcisBrowser:
             await self._fill_form(page, a_number, nat_code, nat_name)
             await self._wait_for_captcha(page)
             await page.locator("#btn_submit").click()
-            with contextlib.suppress(TimeoutError):
-                async with asyncio.timeout(self.lookup_timeout):
-                    await captured.received.wait()
+            await self._wait_for_response(page, captured)
         except PlaywrightError as exc:
             raise UpstreamError("Could not lookup case") from exc
         finally:
@@ -247,6 +248,37 @@ class AcisBrowser:
                 logger.warning("could not close page")
 
         return self._parse(captured)
+
+    async def _wait_for_response(self, page: Page, captured: _Capture) -> None:
+        """Wait for the case response, giving up early on a visible challenge."""
+
+        async def watch_challenge() -> None:
+            await self._wait_for(
+                page,
+                f"{CHALLENGE_IFRAME} >> visible=true",
+                "visible challenge",
+                state="attached",
+                timeout_ms=0,
+            )
+            if captured.requested:
+                await captured.received.wait()
+            else:
+                captured.challenged = True
+
+        tasks = {
+            asyncio.create_task(watch_challenge()),
+            asyncio.create_task(captured.received.wait()),
+        }
+        try:
+            done, _ = await asyncio.wait(
+                tasks, timeout=self.lookup_timeout, return_when=asyncio.FIRST_COMPLETED
+            )
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+        for task in done:
+            task.result()
 
     async def _wait_for(
         self,
@@ -277,7 +309,7 @@ class AcisBrowser:
     async def _wait_for_captcha(self, page: Page) -> None:
         if not await self._wait_for(
             page,
-            'iframe[src*="hcaptcha.com"]',
+            HCAPTCHA_IFRAME,
             "captcha widget",
             state="attached",
             timeout_ms=15_000,
@@ -305,6 +337,11 @@ class AcisBrowser:
 
     def _parse(self, captured: _Capture) -> dict[str, Any]:
         if not captured.received.is_set():
+            if captured.challenged:
+                raise CaptchaError(
+                    "No captcha token obtained: hCaptcha showed a visible challenge",
+                    reason=CaptchaError.Reason.CHALLENGE,
+                )
             if not captured.requested:
                 raise CaptchaError(
                     "No captcha token obtained: the form was submitted but no case "
