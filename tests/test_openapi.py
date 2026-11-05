@@ -18,5 +18,6 @@ async def test_schema_documents_lookup_body(client):
     spec = (await client.get("/schema/openapi.json")).json()
     body = spec["paths"]["/cases/lookup"]["post"]["requestBody"]["content"]
     ref = body["application/json"]["schema"]["$ref"].rsplit("/", 1)[-1]
-    fields = spec["components"]["schemas"][ref]["properties"]
-    assert set(fields) == {"a_number", "nationality", "refresh"}
+    schema = spec["components"]["schemas"][ref]
+    assert set(schema["properties"]) == {"a_number", "nationality", "refresh"}
+    assert set(schema["required"]) == {"a_number", "nationality"}

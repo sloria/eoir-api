@@ -54,7 +54,7 @@ class CaseLookup(msgspec.Struct):
         msgspec.Meta(
             description="EOIR nationality code or country name. See the Nationality dropdown on https://acis.eoir.justice.gov/ for the full list.",
         ),
-    ] = ""
+    ]
     refresh: Annotated[
         bool, msgspec.Meta(description="Bypass the cache and force a fresh lookup.")
     ] = False
