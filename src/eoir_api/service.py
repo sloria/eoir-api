@@ -12,7 +12,7 @@ from typing import Any, Protocol
 import anyio
 import msgspec
 import structlog
-from acis_browser import CaptchaError, raise_for_outcome
+from acis_browser import CaptchaError, Outcome, raise_for_outcome
 from acis_core.nationalities import Nationality
 
 from eoir_api.exceptions import BrowserUnavailableError, QueueTimeoutError
@@ -220,6 +220,15 @@ class CaseService:
         finally:
             self._pending -= 1
 
+        outcome = Outcome.from_payload(payload)
+        if outcome is not Outcome.OK:
+            logger.info(
+                "lookup.no_case",
+                nat_code=nationality.code,
+                browser=slot.name,
+                group=slot.group,
+                outcome=outcome,
+            )
         raise_for_outcome(payload)
         entry = self._cache.set(key, payload)
         logger.info(
