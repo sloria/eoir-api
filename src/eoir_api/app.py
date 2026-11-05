@@ -29,7 +29,6 @@ from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 from sentry_sdk.integrations.litestar import LitestarIntegration
 
 from eoir_api.exceptions import BrowserUnavailableError
-from eoir_api.paths import redact_path
 from eoir_api.routes import ROUTE_HANDLERS
 from eoir_api.service import CaseService
 from eoir_api.settings import Proxy, Settings
@@ -130,21 +129,10 @@ def _scrub_sentry_event(event: Any, hint: Any) -> Any:
     # Captcha errors and cooldowns are expected, so don't send them to Sentry
     if _is_expected_error(hint):
         return None
-
-    # redact A-Numbers from URL and transaction names
     request = event.get("request")
-    if request and request.get("url"):
-        request["url"] = redact_path(request["url"])
-    if event.get("transaction"):
-        event["transaction"] = redact_path(event["transaction"])
+    if request:
+        request.pop("data", None)
     return event
-
-
-def _redact_path_processor(_logger: Any, _method: Any, event_dict: Any) -> Any:
-    path = event_dict.get("path")
-    if isinstance(path, str):
-        event_dict["path"] = redact_path(path)
-    return event_dict
 
 
 def _proxy_settings(proxy: Proxy | None) -> ProxySettings | None:
@@ -165,15 +153,11 @@ def create_app(settings: Settings) -> Litestar:
             integrations=[LitestarIntegration()],
         )
 
-    # Suppress access logs to avoid logging A-Numbers
     logging.getLogger("uvicorn.access").addFilter(lambda _record: False)
     structlog_plugin = StructlogPlugin(
         config=StructlogConfig(
             structlog_logging_config=StructLoggingConfig(
-                processors=[
-                    _redact_path_processor,
-                    *default_structlog_processors(as_json=not _is_tty()),
-                ],
+                processors=default_structlog_processors(as_json=not _is_tty()),
                 standard_lib_logging_config=LoggingConfig(
                     formatters={
                         "standard": {

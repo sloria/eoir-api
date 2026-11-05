@@ -44,5 +44,5 @@ def serve(
         reload=reload,
         host=host or settings.server.host,
         port=port or settings.server.port,
-        access_log=False,  # request paths carry A-Numbers
+        access_log=False,
     )
