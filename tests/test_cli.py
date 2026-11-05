@@ -38,7 +38,7 @@ def test_serve_uses_server_settings_and_disables_access_log(
     [(_, kwargs)] = uvicorn_calls
     assert kwargs["host"] == "127.0.0.1"
     assert kwargs["port"] == 9001
-    assert kwargs["access_log"] is False  # request paths carry A-Numbers
+    assert kwargs["access_log"] is False
 
 
 def test_serve_host_and_port_flags_override_config(

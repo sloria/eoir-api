@@ -12,7 +12,8 @@ This isn't built for scale. It's meant to run as a single process with headed Ch
 
 ```bash
 curl -H "x-api-key: $API_SECRET" \
-  "http://127.0.0.1:8001/cases/123456789?nationality=venezuela"
+  --json '{"a_number": "123456789", "nationality": "venezuela"}' \
+  http://127.0.0.1:8001/cases/lookup
 ```
 
 ```json

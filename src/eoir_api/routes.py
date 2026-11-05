@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+import msgspec
 import structlog
 from acis_browser import (
     CaptchaError,
@@ -12,7 +13,7 @@ from acis_browser import (
 )
 from acis_core.a_numbers import InvalidANumberError, normalize_a_number, redact
 from acis_core.nationalities import UnknownNationalityError, resolve
-from litestar import Response, get
+from litestar import Response, get, post
 from litestar.di import NamedDependency
 from litestar.exceptions import (
     ClientException,
@@ -21,8 +22,9 @@ from litestar.exceptions import (
     ServiceUnavailableException,
     TooManyRequestsException,
 )
-from litestar.params import FromPath, QueryParameter
+from litestar.params import JSONBody
 from litestar.status_codes import (
+    HTTP_200_OK,
     HTTP_422_UNPROCESSABLE_ENTITY,
     HTTP_502_BAD_GATEWAY,
 )
@@ -45,6 +47,19 @@ class BadGatewayException(HTTPException):
     status_code = HTTP_502_BAD_GATEWAY
 
 
+class CaseLookup(msgspec.Struct):
+    a_number: str
+    nationality: Annotated[
+        str,
+        msgspec.Meta(
+            description="EOIR nationality code or country name. See the Nationality dropdown on https://acis.eoir.justice.gov/ for the full list.",
+        ),
+    ] = ""
+    refresh: Annotated[
+        bool, msgspec.Meta(description="Bypass the cache and force a fresh lookup.")
+    ] = False
+
+
 ##### Route handlers #####
 
 
@@ -57,8 +72,9 @@ def health() -> Response:
     return Response("ok", status_code=200)
 
 
-@get(
-    "/cases/{a_number:str}",
+@post(
+    "/cases/lookup",
+    status_code=HTTP_200_OK,
     guards=[require_api_key],
     raises=[
         NotFoundException,
@@ -67,35 +83,25 @@ def health() -> Response:
         ServiceUnavailableException,
     ],
 )
-async def get_case(
+async def lookup_case(
     *,
-    a_number: FromPath[str],
+    data: JSONBody[CaseLookup],
     service: NamedDependency[CaseService],
-    nationality: Annotated[
-        str,
-        QueryParameter(
-            description="EOIR nationality code or country name. See the Nationality dropdown on https://acis.eoir.justice.gov/ for the full list.",
-        ),
-    ] = "",
-    refresh: Annotated[
-        bool,
-        QueryParameter(description="Bypass the cache and force a fresh lookup."),
-    ] = False,
 ) -> Case:
     """Look up current case information for an A-Number and nationality."""
     try:
-        cleaned = normalize_a_number(a_number)
+        cleaned = normalize_a_number(data.a_number)
     except InvalidANumberError as exc:
         raise ClientException(str(exc)) from exc
 
     try:
-        resolved = resolve(nationality)
+        resolved = resolve(data.nationality)
     except UnknownNationalityError as exc:
         raise ClientException(str(exc)) from exc
 
     log = logger.bind(a_number=redact(cleaned), nat_code=resolved.code)
     try:
-        return await service.get_case(cleaned, resolved, refresh=refresh)
+        return await service.get_case(cleaned, resolved, refresh=data.refresh)
     except CaseNotFoundError as exc:
         log.info("case.not_found")
         raise NotFoundException("No case found for that A-Number.") from exc
@@ -128,4 +134,4 @@ async def get_case(
         raise BadGatewayException(f"Upstream error: {exc}") from exc
 
 
-ROUTE_HANDLERS = [health, get_case]
+ROUTE_HANDLERS = [health, lookup_case]
