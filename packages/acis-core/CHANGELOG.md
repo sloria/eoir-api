@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/sloria/eoir-api/compare/acis-core-v1.2.0...acis-core-v1.2.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **acis-core:** redact uses correct number of asterisks ([#76](https://github.com/sloria/eoir-api/issues/76)) ([fdf1de0](https://github.com/sloria/eoir-api/commit/fdf1de0e937f65716a937d3fe575a75c19934046))
+
 ## [1.2.0](https://github.com/sloria/eoir-api/compare/acis-core-v1.1.0...acis-core-v1.2.0) (2026-10-22)
 
 
