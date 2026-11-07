@@ -4,5 +4,12 @@
     "config:best-practices",
     "group:allNonMajor",
     ":enablePreCommit"
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["patchright"],
+      "groupName": "patchright",
+      "schedule": ["at any time"]
+    }
   ]
 }
