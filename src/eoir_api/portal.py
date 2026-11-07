@@ -21,7 +21,7 @@ from eoir_api.usage import LookupOutcome, TenantUsage
 
 FAILED: set[LookupOutcome] = {"unavailable", "captcha", "upstream_error"}
 LABELS: dict[LookupOutcome, str] = {
-    "ok": "Found",
+    "ok": "OK",
     "not_found": "Not found",
     "invalid_nationality": "Invalid nationality",
     "unavailable": "Case unavailable",

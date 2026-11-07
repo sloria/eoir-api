@@ -142,7 +142,7 @@ async def test_portal_lists_redacted_lookups_with_status(client):
     text = (await portal(client)).text
     assert "*****6789" in text
     assert "123456789" not in text
-    assert re.search(r'<td class="ok">\s*Found\s*</td>', text)
+    assert re.search(r'<td class="ok">\s*OK\s*</td>', text)
 
 
 async def test_portal_lookups_are_tenant_scoped(client, usage_service):
