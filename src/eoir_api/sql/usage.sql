@@ -31,3 +31,23 @@ FROM lookups
 WHERE tenant = ? AND coalesce(ts < ?, 1) AND coalesce(ts >= ?, 1)
 ORDER BY ts DESC, id DESC
 LIMIT ?;
+
+-- name: lookups_after
+-- param: tenant str
+-- param: cursor str
+-- param: before str?
+-- param: limit int
+SELECT ts, a_number_last_4, outcome, cached, duration_ms
+FROM lookups
+WHERE tenant = ? AND ts > ? AND coalesce(ts < ?, 1)
+ORDER BY ts ASC, id ASC
+LIMIT ?;
+
+-- name: count_lookups
+-- param: newer_than str?
+-- param: tenant str
+-- param: before str?
+-- param: after str?
+SELECT count(*) AS total, coalesce(sum(ts > ?), 0) AS newer
+FROM lookups
+WHERE tenant = ? AND coalesce(ts < ?, 1) AND coalesce(ts >= ?, 1);

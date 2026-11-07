@@ -58,6 +58,12 @@ class UsageSummary(msgspec.Struct):
     """Lookups in the rolling 24h that count against quota."""
 
 
+class LookupCount(msgspec.Struct):
+    total: int
+    newer: int
+    """Of ``total``, how many are newer than the given timestamp."""
+
+
 class OutcomeCount(msgspec.Struct):
     outcome: LookupOutcome
     count: int
@@ -72,8 +78,8 @@ def create_config(db_path: Path) -> AiosqliteConfig:
     )
 
 
-def iso(ts: dt.datetime) -> str:
-    return ts.astimezone(dt.UTC).isoformat()
+def iso(ts: dt.datetime | None) -> str | None:
+    return ts.astimezone(dt.UTC).isoformat() if ts else None
 
 
 class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
@@ -125,12 +131,50 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
             rows = await db.select(
                 queries.get_sql("lookups"),
                 tenant,
-                iso(before) if before else None,
-                iso(after) if after else None,
+                iso(before),
+                iso(after),
                 limit,
             )
         # Non-strict so SQLite's 0/1 becomes a bool
         return msgspec.convert(rows, list[LookupItem], strict=False)
+
+    async def lookups_after(
+        self,
+        tenant: str,
+        cursor: dt.datetime,
+        *,
+        limit: int,
+        before: dt.datetime | None = None,
+    ) -> list[LookupItem]:
+        """Return the ``limit`` lookups just newer than ``cursor``, oldest first."""
+        async with self.provide_session() as db:
+            rows = await db.select(
+                queries.get_sql("lookups_after"),
+                tenant,
+                iso(cursor),
+                iso(before),
+                limit,
+            )
+        return msgspec.convert(rows, list[LookupItem], strict=False)
+
+    async def count(
+        self,
+        tenant: str,
+        *,
+        before: dt.datetime | None = None,
+        after: dt.datetime | None = None,
+        newer_than: dt.datetime | None = None,
+    ) -> LookupCount:
+        """Count lookups in ``[after, before)``, and those newer than ``newer_than``."""
+        async with self.provide_session() as db:
+            return await db.select_one(
+                queries.get_sql("count_lookups"),
+                iso(newer_than),
+                tenant,
+                iso(before),
+                iso(after),
+                schema_type=LookupCount,
+            )
 
     async def prune(self) -> int:
         """Delete lookups past the retention period; return how many."""
@@ -192,4 +236,22 @@ class TenantUsage:
     ) -> list[LookupItem]:
         return await self.service.lookups(
             self.tenant.name, limit=limit, before=before, after=after
+        )
+
+    async def count(
+        self,
+        *,
+        before: dt.datetime | None = None,
+        after: dt.datetime | None = None,
+        newer_than: dt.datetime | None = None,
+    ) -> LookupCount:
+        return await self.service.count(
+            self.tenant.name, before=before, after=after, newer_than=newer_than
+        )
+
+    async def lookups_after(
+        self, cursor: dt.datetime, *, limit: int, before: dt.datetime | None = None
+    ) -> list[LookupItem]:
+        return await self.service.lookups_after(
+            self.tenant.name, cursor, limit=limit, before=before
         )

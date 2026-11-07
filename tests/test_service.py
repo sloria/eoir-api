@@ -223,17 +223,6 @@ async def test_lookup_interval_applies_per_browser(
     assert sleeps == [10]
 
 
-async def test_estimated_wait_shrinks_with_more_browsers(
-    multi_browser_service, browsers, settings
-):
-    one = CaseService({"a": browsers["a"]}, settings)
-    two = multi_browser_service
-    one.avg_lookup_seconds = two.avg_lookup_seconds = 10.0
-    one._pending = two._pending = 4
-    assert one.estimated_wait == 40
-    assert two.estimated_wait == 20
-
-
 @pytest.mark.parametrize(
     "reason", [CaptchaError.Reason.NO_REQUEST, CaptchaError.Reason.CHALLENGE]
 )

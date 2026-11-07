@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% macro pager_link(label, url) %}
+  {% if url %}<a href="{{ url }}">{{ label }}</a>{% else %}<span class="muted" aria-disabled="true">{{ label }}</span>{% endif %}
+{% endmacro %}
 {% block main %}
   <div class="stat">
     <span class="muted">Past 24 hours</span>
@@ -6,8 +9,8 @@
     <span class="muted">lookup{{ "" if usage.used == 1 and not usage.quota else "s" }}</span>
   </div>
 
-  <section class="flow">
-    <form class="cluster" method="get" action="/portal">
+  <section id="lookups" class="flow">
+    <form class="cluster" method="get" action="/portal#lookups">
       <h2 class="push">Lookups</h2>
       <label for="from">From</label>
       <input id="from" name="from" type="date" class="field field-sm" value="{{ from or '' }}">
@@ -21,7 +24,7 @@
           <tr>
             <th>A-Number</th>
             <th>Status</th>
-            <th>Time (UTC)</th>
+            <th id="time-heading">Time (UTC)</th>
             <th class="text-end">Duration</th>
           </tr>
         </thead>
@@ -32,7 +35,7 @@
               <td class="{{ item.outcome | status_class }}">
                 {{ item.outcome | outcome_label }}{% if item.cached %} <span class="muted">(cached)</span>{% endif %}
               </td>
-              <td>{{ item.ts.strftime("%b %-d, %H:%M") }}</td>
+              <td><time datetime="{{ item.ts.isoformat() }}">{{ item.ts.strftime("%b %-d, %H:%M UTC") }}</time></td>
               <td class="text-end">{{ item.duration_ms | duration }}</td>
             </tr>
           {% else %}
@@ -41,9 +44,33 @@
         </tbody>
       </table>
     </div>
-    <div class="cluster justify-end">
-      {% if before %}<a href="{{ page_url() }}">Latest</a>{% endif %}
-      {% if next_before %}<a href="{{ page_url(before=next_before.isoformat()) }}">Next</a>{% endif %}
-    </div>
+    {% if items %}
+      {% set first, last, total = position %}
+      <div class="cluster">
+        <span class="muted push">{{ "{:,}–{:,} of {:,}".format(first, last, total) }}</span>
+        {% if prev_after or next_before %}
+          {{ pager_link("Previous", prev_after and page_url(after=prev_after.isoformat())) }}
+          {{ pager_link("Next", next_before and page_url(before=next_before.isoformat())) }}
+        {% endif %}
+      </div>
+    {% endif %}
   </section>
+  <script>
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    document.cookie = `tz=${tz}; path=/portal; max-age=31536000; samesite=lax`;
+    const fmt = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    const zoneName = new Intl.DateTimeFormat(undefined, { timeZoneName: "shortGeneric" })
+      .formatToParts()
+      .find((part) => part.type === "timeZoneName").value;
+    document.getElementById("time-heading").textContent = `Time (${zoneName})`;
+    for (const el of document.querySelectorAll("time[datetime]")) {
+      el.textContent = fmt.format(new Date(el.dateTime));
+      el.title = el.dateTime;
+    }
+  </script>
 {% endblock %}

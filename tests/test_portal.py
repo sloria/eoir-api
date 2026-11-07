@@ -24,6 +24,11 @@ async def login(client, key="metered-test-secret"):
     return await client.post("/portal/login", data=data, follow_redirects=False)
 
 
+def page_link(html: str, label: str) -> str | None:
+    match = re.search(rf'href="([^"]*)">{label}<', html)
+    return match and match[1].replace("&amp;", "&")
+
+
 async def portal(client, **params):
     return await client.get("/portal", params=params, follow_redirects=False)
 
@@ -160,14 +165,24 @@ async def test_portal_paginates_newest_first(client, usage_service):
     assert "Jul 25, 12:00" in first
     assert "Jul 25, 11:11" in first
     assert "Jul 25, 11:10" not in first
-    assert "Latest" not in first
-    [next_url] = re.findall(r'href="([^"]*)">Next<', first)
+    assert page_link(first, "Previous") is None
+    assert "1\N{EN DASH}50 of 60" in first
+    next_url = page_link(first, "Next")
 
     rest = (await client.get(next_url, follow_redirects=False)).text
     assert "Jul 25, 11:10" in rest
     assert "Jul 25, 11:11" not in rest
-    assert "Latest" in rest
-    assert "Next" not in rest
+    assert page_link(rest, "Next") is None
+    assert "51\N{EN DASH}60 of 60" in rest
+    prev_url = page_link(rest, "Previous")
+
+    back = (await client.get(prev_url)).text
+    assert "Jul 25, 12:00" in back
+    assert "Jul 25, 11:11" in back
+    assert "Jul 25, 11:10" not in back
+    assert page_link(back, "Previous") is None
+    assert "1\N{EN DASH}50 of 60" in back
+    assert page_link(back, "Next")
 
 
 async def test_portal_filters_by_date_range(client, usage_service):
@@ -178,6 +193,32 @@ async def test_portal_filters_by_date_range(client, usage_service):
     assert "Jul 23" in text
     assert "Jul 25" not in text
     assert "Jul 22" not in text
+
+
+async def test_portal_ignores_blank_date_field(client, usage_service):
+    await seed(usage_service, *(dt.timedelta(days=d) for d in range(3)))
+    await login(client)
+    response = await portal(client, **{"from": "2026-07-24", "to": ""})
+    assert response.status_code == 200
+    assert 'value="2026-07-24"' in response.text
+    assert "Jul 23" not in response.text
+
+
+async def test_portal_redirects_on_invalid_date(client):
+    await login(client)
+    response = await portal(client, **{"from": "nope"})
+    assert response.status_code == 302
+    assert response.headers["location"] == "/portal"
+
+
+async def test_portal_date_range_uses_client_timezone(client, usage_service):
+    # 2026-07-25 02:00 UTC is Jul 24 evening in New York
+    await seed(usage_service, dt.timedelta(hours=10))
+    await login(client)
+    day = {"from": "2026-07-24", "to": "2026-07-24"}
+    assert "No lookups" in (await portal(client, **day)).text
+    client.cookies["tz"] = "America/New_York"
+    assert "Jul 25, 02:00" in (await portal(client, **day)).text
 
 
 ##### Disabled #####

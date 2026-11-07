@@ -4,13 +4,14 @@ import datetime as dt
 import time
 from typing import Annotated, Any
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import msgspec
 from litestar import Controller, Request, get, post
 from litestar.datastructures import State
 from litestar.di import NamedDependency
 from litestar.exceptions import NotAuthorizedException, ValidationException
-from litestar.params import QueryParameter, URLEncodedBody
+from litestar.params import CookieParameter, QueryParameter, URLEncodedBody
 from litestar.plugins.jinja import JinjaTemplateEngine
 from litestar.response import Redirect, Template
 from litestar.status_codes import HTTP_303_SEE_OTHER, HTTP_401_UNAUTHORIZED
@@ -61,10 +62,28 @@ def portal_redirect(request: Request[Any, Any, State], exc: Exception) -> Redire
     return Redirect("/portal")
 
 
-def midnight(day: dt.date | None, days: int = 0) -> dt.datetime | None:
+def zone(name: str | None) -> dt.tzinfo:
+    """Resolve an IANA zone name, falling back to UTC."""
+    try:
+        return ZoneInfo(name) if name else dt.UTC
+    except ZoneInfoNotFoundError, ValueError:
+        return dt.UTC
+
+
+def parse_day(value: str | None) -> dt.date | None:
+    """Parse an ISO date, treating a blank form field as no date."""
+    if not value:
+        return None
+    try:
+        return dt.date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValidationException(f"Invalid date: {value}") from exc
+
+
+def midnight(day: dt.date | None, tz: dt.tzinfo, days: int = 0) -> dt.datetime | None:
     if day is None:
         return None
-    return dt.datetime.combine(day + dt.timedelta(days=days), dt.time(), tzinfo=dt.UTC)
+    return dt.datetime.combine(day + dt.timedelta(days=days), dt.time(), tzinfo=tz)
 
 
 class PortalController(Controller):
@@ -81,29 +100,44 @@ class PortalController(Controller):
         self,
         request: Request[Tenant, Any, State],
         usage: NamedDependency[TenantUsage],
+        *,
         before: Annotated[dt.datetime | None, QueryParameter()] = None,
-        from_: Annotated[dt.date | None, QueryParameter(name="from")] = None,
-        to: Annotated[dt.date | None, QueryParameter()] = None,
+        after: Annotated[dt.datetime | None, QueryParameter()] = None,
+        from_param: Annotated[str | None, QueryParameter(name="from")] = None,
+        to_param: Annotated[str | None, QueryParameter(name="to")] = None,
+        tz: Annotated[str | None, CookieParameter(name="tz")] = None,
     ) -> Template:
-        items = await usage.lookups(
-            limit=PAGE_SIZE + 1,
-            before=before or midnight(to, days=1),
-            after=midnight(from_),
-        )
-        next_before = items[PAGE_SIZE - 1].ts if len(items) > PAGE_SIZE else None
+        from_, to = parse_day(from_param), parse_day(to_param)
+        tzinfo = zone(tz)
+        start, end = midnight(from_, tzinfo), midnight(to, tzinfo, days=1)
+        if after:
+            newer = await usage.lookups_after(after, limit=PAGE_SIZE + 1, before=end)
+            has_prev, has_next = len(newer) > PAGE_SIZE, True
+            items = newer[:PAGE_SIZE][::-1]
+        else:
+            older = await usage.lookups(
+                limit=PAGE_SIZE + 1,
+                before=before or end,
+                after=start,
+            )
+            has_prev, has_next = before is not None, len(older) > PAGE_SIZE
+            items = older[:PAGE_SIZE]
+        newest, oldest = (items[0].ts, items[-1].ts) if items else (None, None)
+        count = await usage.count(before=end, after=start, newer_than=newest)
         range_ = {k: v for k, v in (("from", from_), ("to", to)) if v}
 
         def page_url(**params: str) -> str:
-            return f"/portal?{urlencode({**range_, **params})}"
+            return f"/portal?{urlencode({**range_, **params})}#lookups"
 
         return Template(
             "portal.html",
             context={
                 "tenant": request.user,
                 "usage": await usage.summary(),
-                "items": items[:PAGE_SIZE],
-                "next_before": next_before,
-                "before": before,
+                "items": items,
+                "prev_after": newest if has_prev else None,
+                "next_before": oldest if has_next else None,
+                "position": (count.newer + 1, count.newer + len(items), count.total),
                 "from": from_,
                 "to": to,
                 "page_url": page_url,
