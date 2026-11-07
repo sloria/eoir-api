@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.4.0...acis-browser-v3.5.0) (2026-11-07)
+
+
+### Features
+
+* improve error handling and messages ([#69](https://github.com/sloria/eoir-api/issues/69)) ([655a025](https://github.com/sloria/eoir-api/commit/655a025031ddf98b737cabaa5a5554426735a3d6))
+
 ## [3.4.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.3.0...acis-browser-v3.4.0) (2026-11-04)
 
 
