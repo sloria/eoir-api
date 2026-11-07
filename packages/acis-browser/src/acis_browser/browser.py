@@ -13,11 +13,13 @@ from typing import TYPE_CHECKING, Any, Literal, Self
 import structlog
 from acis_core.a_numbers import redact
 from acis_core.outcome import Outcome
+from patchright._impl._errors import TargetClosedError  # not re-exported publicly
 from patchright.async_api import Error as PlaywrightError
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 from patchright.async_api import async_playwright
 
 from acis_browser.exceptions import (
+    BrowserLostError,
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
@@ -189,7 +191,7 @@ class AcisBrowser:
                         logger.warning("lookup.browser_lost", error=str(exc))
                         with contextlib.suppress(*BROWSER_LOST_ERRORS):
                             await self._close()
-                        raise UpstreamError("Chrome is no longer available") from exc
+                        raise BrowserLostError("Chrome is no longer available") from exc
                     else:
                         return payload
             finally:
@@ -200,7 +202,7 @@ class AcisBrowser:
     ) -> dict[str, Any]:
         """Fill the form and return the parsed backend response."""
         if self._context is None:  # pragma: no cover
-            raise UpstreamError("Browser is not running")
+            raise BrowserLostError("Browser is not running")
         page = await self._context.new_page()
         captured = _Capture()
         case_info_path = "/api/Case/GetCaseInfo"
@@ -239,6 +241,8 @@ class AcisBrowser:
             await self._wait_for_captcha(page)
             await page.locator("#btn_submit").click()
             await self._wait_for_response(page, captured)
+        except TargetClosedError:
+            raise
         except PlaywrightError as exc:
             raise UpstreamError("Could not lookup case") from exc
         finally:

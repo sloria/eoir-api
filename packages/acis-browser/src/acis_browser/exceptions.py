@@ -40,3 +40,7 @@ class CaseUnavailableError(AcisError):
 
 class UpstreamError(AcisError):
     """Raised when ACIS returns an unexpected response."""
+
+
+class BrowserLostError(UpstreamError):
+    """Raised when Chrome dies or isn't running."""
