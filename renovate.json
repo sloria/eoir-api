@@ -7,6 +7,10 @@
   ],
   "packageRules": [
     {
+      "matchDatasources": ["pypi"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
       "matchPackageNames": ["patchright"],
       "groupName": "patchright",
       "schedule": ["at any time"]
