@@ -74,6 +74,14 @@ async def test_captcha_failure_does_not_count(client, usage_service, browser):
     assert [r.outcome for r in await lookup_rows(usage_service)] == ["captcha"]
 
 
+async def test_upstream_error_does_not_count(client, usage_service, browser):
+    browser.error = UpstreamError("ACIS returned HTTP 500")
+    response = await lookup(client)
+    assert response.status_code == 502
+    assert response.headers["X-RateLimit-Remaining"] == "5"
+    assert [r.outcome for r in await lookup_rows(usage_service)] == ["upstream_error"]
+
+
 async def test_not_found_counts(client, browser):
     browser.error = CaseNotFoundError("No case info found")
     response = await lookup(client)
@@ -137,9 +145,8 @@ async def test_only_last_four_digits_are_stored(client, usage_service):
 
 
 async def test_prune_deletes_rows_past_retention(usage_service):
-    await seed(usage_service, dt.timedelta(days=31), dt.timedelta(days=29))
+    keep = dt.timedelta(days=usage_service.retention_days - 1)
+    await seed(usage_service, keep + dt.timedelta(days=2), keep)
     deleted = await usage_service.prune()
     assert deleted == 1
-    assert [r.ts for r in await lookup_rows(usage_service)] == [
-        NOW - dt.timedelta(days=29)
-    ]
+    assert [r.ts for r in await lookup_rows(usage_service)] == [NOW - keep]

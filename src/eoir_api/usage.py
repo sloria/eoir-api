@@ -25,8 +25,7 @@ LookupOutcome = Literal[
     "upstream_error",
 ]
 
-# Browser lookups that produce no result
-UNCOUNTED: set[LookupOutcome] = {"captcha"}
+UNCOUNTED: set[LookupOutcome] = {"captcha", "upstream_error"}
 
 queries = SQLFileLoader()
 queries.load_sql(Path(__file__).parent / "sql" / "usage.sql")

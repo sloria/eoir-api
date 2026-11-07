@@ -54,7 +54,7 @@ name = "default"
 # Default: platform user data dir, e.g. on macOS:
 # db_path = "~/Library/Application Support/eoir-api/usage.sqlite"
 # Days to keep lookup records
-retention_days = 30
+retention_days = 180
 
 [sentry]
 # Sentry DSN; empty disables Sentry. e.g. { env = "SENTRY_DSN" }

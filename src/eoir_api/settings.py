@@ -64,7 +64,7 @@ class Lookup(_Base):
 
 class Usage(_Base):
     db_path: Path = user_data_path("eoir-api") / "usage.sqlite"
-    retention_days: Annotated[int, msgspec.Meta(ge=1)] = 30
+    retention_days: Annotated[int, msgspec.Meta(ge=1)] = 180
 
 
 class Portal(_Base):
