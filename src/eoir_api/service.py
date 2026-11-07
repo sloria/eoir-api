@@ -136,15 +136,25 @@ class CaseService:
         ]
         if not candidates:
             raise self._unavailable()
-        # untried group first, then unlocked, then least recently used
         return min(
             candidates,
             key=lambda slot: (
+                # On a retry, pick a browser from the following, in order:
+                # An untried group
                 slot.group in tried_groups,
+                # the group challenged longest ago
+                self._last_challenged(slot) if exclude else -math.inf,
+                # unlocked
                 slot.lock.locked(),
+                # least recently used
                 slot.last_started,
             ),
         )
+
+    def _last_challenged(self, slot: BrowserSlot) -> float:
+        if slot.group is None:
+            return slot.cooldown_until
+        return max(s.cooldown_until for s in self._slots if s.group == slot.group)
 
     async def _lookup(
         self, a_number: str, nationality: Nationality

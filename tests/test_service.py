@@ -351,6 +351,31 @@ async def test_retry_prefers_a_browser_in_another_group(
     assert len(c.calls) == 1
 
 
+async def test_retry_prefers_the_group_challenged_longest_ago(
+    usage, master_hearing, settings, clock
+):
+    configure_browsers(
+        settings,
+        a=("socks5://host-a:1081", "provider-a"),
+        b=("socks5://host-b:1081", "provider-b"),
+        d=("socks5://host-d:1081", "provider-c"),
+        c=("socks5://host-c:1081", "provider-b"),
+        e=("socks5://host-e:1081", "provider-d"),
+    )
+    a, b, c, d, e = (FakeAcisBrowser(payload=master_hearing) for _ in "abcde")
+    service = CaseService(  # ties break on dict order: d before c
+        {"a": a, "b": b, "d": d, "c": c, "e": e}, settings, clock=clock
+    )
+    a.error = b.error = d.error = CAPTCHA
+    with pytest.raises(CaptchaError):  # a, then b: provider-b is now challenged
+        await service.get_case(A_NUMBER, VE, usage=usage)
+
+    await service.get_case("100000001", VE, usage=usage)  # d, then a retry
+
+    assert len(c.calls) == 0
+    assert len(e.calls) == 1
+
+
 async def test_retry_falls_back_to_the_same_group(
     usage, master_hearing, settings, clock
 ):
