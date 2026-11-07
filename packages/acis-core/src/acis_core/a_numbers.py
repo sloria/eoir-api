@@ -23,4 +23,4 @@ def normalize_a_number(value: str) -> str:
 
 
 def redact(a_number: str) -> str:
-    return f"***{a_number[-4:]}" if len(a_number) >= 4 else "***"
+    return f"*****{a_number[-4:]}" if len(a_number) >= 4 else "*****"
