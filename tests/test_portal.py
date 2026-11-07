@@ -140,7 +140,7 @@ async def test_portal_lists_redacted_lookups_with_status(client):
     await lookup(client, body={"a_number": "123-456-789", "nationality": "VE"})
     await login(client)
     text = (await portal(client)).text
-    assert "***6789" in text
+    assert "*****6789" in text
     assert "123456789" not in text
     assert re.search(r'<td class="ok">\s*Found\s*</td>', text)
 
