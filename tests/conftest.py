@@ -6,15 +6,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import msgspec
 import pytest
 from acis_browser import CaseNotFoundError
-from litestar.datastructures import State
-from litestar.di import Provide
-from litestar.testing import AsyncTestClient, create_async_test_client
+from litestar.testing import AsyncTestClient
+from sqlspec import SQLSpec
 
-from eoir_api.app import ROUTE_HANDLERS, create_openapi_config
+from eoir_api.app import build_app
 from eoir_api.service import CaseService
-from eoir_api.settings import Chrome, Lookup, Secret, Settings
+from eoir_api.settings import (
+    Chrome,
+    Lookup,
+    Portal,
+    Secret,
+    Settings,
+    Tenant,
+    Usage,
+)
+from eoir_api.usage import LookupOutcome, UsageService, create_config
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -26,6 +35,11 @@ pytestmark = pytest.mark.anyio
 HERE = Path(__file__).parent
 FIXTURES = HERE / "fixtures"
 
+NOW = dt.datetime(2026, 7, 25, 12, 0, tzinfo=dt.UTC)
+OWNER = {"x-api-key": "owner-test-secret"}
+METERED = {"x-api-key": "metered-test-secret"}
+BODY = {"a_number": "123456789", "nationality": "VE"}
+
 
 # Required for pytest-anyio
 @pytest.fixture(scope="session")
@@ -36,7 +50,7 @@ def anyio_backend() -> str:
 # Freeze time so retrieved_at and cache behaviour are deterministic.
 @pytest.fixture(autouse=True)
 def set_time(time_machine):
-    time_machine.move_to(dt.datetime(2026, 7, 25, 12, 0, 0, tzinfo=dt.UTC), tick=False)
+    time_machine.move_to(NOW, tick=False)
 
 
 def load_fixture(name: str) -> dict[str, Any]:
@@ -69,9 +83,14 @@ class FakeAcisBrowser:
 def settings(tmp_path) -> Settings:
     return Settings(
         debug=True,
-        api_secret=Secret("test-secret"),
+        tenants=[
+            Tenant(name="owner", key=Secret("owner-test-secret")),
+            Tenant(name="metered", key=Secret("metered-test-secret"), quota_per_day=5),
+        ],
+        portal=Portal(secret=Secret("portal-secret")),
         chrome=Chrome(profiles_dir=tmp_path / "profiles"),
         lookup=Lookup(interval=0),
+        usage=Usage(db_path=tmp_path / "usage.sqlite"),
     )
 
 
@@ -100,13 +119,47 @@ def service(browser, settings, clock) -> CaseService:
 
 @pytest.fixture
 async def client(settings, service) -> AsyncIterator[AsyncTestClient[Litestar]]:
-    async def provide_service() -> CaseService:
-        return service
-
-    async with create_async_test_client(
-        route_handlers=ROUTE_HANDLERS,
-        openapi_config=create_openapi_config(),
-        state=State({"settings": settings}),
-        dependencies={"service": Provide(provide_service)},
-    ) as test_client:
+    async with AsyncTestClient(app=build_app(settings, service)) as test_client:
         yield test_client
+
+
+@pytest.fixture
+async def usage_service(settings) -> AsyncIterator[UsageService]:
+    spec = SQLSpec()
+    config = spec.add_config(create_config(settings.usage.db_path))
+    await config.migrate_up(use_logger=True, summary_only=True)
+    yield UsageService(config, settings.usage.retention_days)
+    await spec.close_all_pools()
+
+
+class LookupRow(msgspec.Struct):
+    id: int
+    tenant: str
+    ts: dt.datetime
+    a_number_redacted: str
+    outcome: LookupOutcome
+    cached: int
+    duration_ms: int | None
+
+
+async def lookup_rows(service: UsageService) -> list[LookupRow]:
+    async with service.provide_session() as db:
+        return await db.select(
+            "SELECT * FROM lookups ORDER BY id", schema_type=LookupRow
+        )
+
+
+async def lookup(client, headers=METERED, body=BODY):
+    return await client.post("/cases/lookup", json=body, headers=headers)
+
+
+async def seed(service, *ages, tenant="metered", outcome="ok", cached=False):
+    for age in ages:
+        await service.record(
+            tenant=tenant,
+            ts=NOW - age,
+            a_number="000000000",
+            outcome=outcome,
+            cached=cached,
+            duration_ms=None if cached else 1000,
+        )

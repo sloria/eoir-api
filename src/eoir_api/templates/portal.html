@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block main %}
+  <div class="stat">
+    <span class="muted">Past 24 hours</span>
+    <strong>{{ "{:,}".format(usage.used) }}{% if usage.quota %} / {{ "{:,}".format(usage.quota.limit) }}{% endif %}</strong>
+    <span class="muted">lookups</span>
+  </div>
+
+  <section class="flow">
+    <form class="cluster" method="get" action="/portal">
+      <h2 class="push">Lookups</h2>
+      <label for="from">From</label>
+      <input id="from" name="from" type="date" class="field field-sm" value="{{ from or '' }}">
+      <label for="to">To</label>
+      <input id="to" name="to" type="date" class="field field-sm" value="{{ to or '' }}">
+      <button type="submit" class="btn">Apply</button>
+    </form>
+    <div class="scroll-x">
+      <table>
+        <thead>
+          <tr>
+            <th>A-Number</th>
+            <th>Status</th>
+            <th>Time (UTC)</th>
+            <th class="text-end">Duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+            <tr>
+              <td>{{ item.a_number_redacted }}</td>
+              <td class="{{ item.outcome | status_class }}">
+                {{ item.outcome | outcome_label }}{% if item.cached %} <span class="muted">(cached)</span>{% endif %}
+              </td>
+              <td>{{ item.ts.strftime("%b %-d, %H:%M") }}</td>
+              <td class="text-end">{{ item.duration_ms | duration }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="muted">No lookups</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="cluster justify-end">
+      {% if before %}<a href="{{ page_url() }}">Latest</a>{% endif %}
+      {% if next_before %}<a href="{{ page_url(before=next_before.isoformat()) }}">Next</a>{% endif %}
+    </div>
+  </section>
+{% endblock %}

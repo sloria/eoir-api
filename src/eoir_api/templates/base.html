@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EOIR API Portal</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --font-main: ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --bg: #fff;
+        --text: #444;
+        --muted: #787878;
+        --border: #444;
+        --light-grey: #f3f2f2;
+        --blue: #1853bb;
+        --light-blue: #4d8aff;
+        --bg-error: #f8d7da;
+        --text-error: #721c24;
+        --text-success: #155724;
+        --text-warning: #856404;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #181a1b;
+          --text: #e0e0e0;
+          --muted: #b0b0b0;
+          --border: #e0e0e0;
+          --light-grey: #242728;
+          --blue: #4d8aff;
+          --bg-error: #2d1b1e;
+          --text-error: #f5c6cb;
+          --text-success: #c3e6cb;
+          --text-warning: #ffeaa7;
+        }
+      }
+
+      /* Global */
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-main);
+        line-height: 1.5;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      a {
+        color: var(--blue);
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 2em;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 1.5em;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 0.5em 0.6em;
+        white-space: nowrap;
+      }
+
+      th {
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+
+      td {
+        border-bottom: 1px solid var(--light-grey);
+      }
+
+      /* Compositions */
+
+      .container {
+        width: 100%;
+        max-width: 1000px;
+        margin-inline: auto;
+        padding-inline: 1.25rem;
+      }
+
+      .flow > * + * {
+        margin-block-start: var(--flow-space, 1rem);
+      }
+
+      .cluster {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--gutter, 0.6em);
+      }
+
+      .repel {
+        justify-content: space-between;
+      }
+
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3em;
+      }
+
+      /* Utilities */
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .err {
+        color: var(--text-error);
+      }
+
+      .ok {
+        color: var(--text-success);
+      }
+
+      .warn {
+        color: var(--text-warning);
+      }
+
+      .text-end {
+        text-align: right;
+      }
+
+      .justify-end {
+        justify-content: flex-end;
+      }
+
+      .push {
+        margin-inline-end: auto;
+      }
+
+      .scroll-x {
+        overflow-x: auto;
+      }
+
+      /* Blocks */
+
+      .site-nav {
+        --gutter: 1em;
+        padding-block: 1em 0.6em;
+      }
+
+      .site-main {
+        --flow-space: 1.5rem;
+        padding-block: 1.25rem 2.5rem;
+      }
+
+      .wordmark {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .btn {
+        cursor: pointer;
+        background: var(--light-grey);
+        color: var(--text);
+        font: inherit;
+        padding: 0.4em 0.8em;
+        border: 1px solid var(--border);
+      }
+
+      .btn-link {
+        cursor: pointer;
+        background: none;
+        border: 0;
+        padding: 0;
+        font: inherit;
+        color: var(--blue);
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+
+      .btn-primary {
+        background: var(--blue);
+        color: #fff;
+        border-color: var(--blue);
+      }
+
+      .field {
+        color: var(--text);
+        font: inherit;
+        padding: 0.5em;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        outline: none;
+
+        &:focus {
+          border-color: var(--light-blue);
+          box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--light-blue) 25%, transparent);
+        }
+      }
+
+      .field-key {
+        width: 100%;
+        font-family: var(--font-mono);
+      }
+
+      .field-sm {
+        padding: 0.3em 0.5em;
+      }
+
+      .login {
+        max-width: 480px;
+      }
+
+      .alert {
+        padding: 0.8em;
+        background: var(--bg-error);
+        color: var(--text-error);
+      }
+
+      .stat {
+        display: grid;
+        grid-template-columns: max-content max-content;
+        align-items: baseline;
+        column-gap: 0.4em;
+
+        & > :first-child {
+          grid-column: 1 / -1;
+        }
+
+        & strong {
+          font-size: 1.5em;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="site-nav container cluster repel">
+      <a class="wordmark" href="/portal">EOIR API</a>
+      {% if tenant %}
+        <div class="cluster">
+          <a href="/schema">API Docs</a>
+          <span class="muted">Signed in as {{ tenant.name }}</span>
+          <form method="post" action="/portal/logout">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-link">Sign out</button>
+          </form>
+        </div>
+      {% endif %}
+    </nav>
+    <main class="site-main container flow">
+      {% block main %}{% endblock %}
+    </main>
+  </body>
+</html>

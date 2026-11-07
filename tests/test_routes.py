@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import structlog
 from acis_browser import (
     BrowserLostError,
     CaptchaError,
@@ -13,7 +14,7 @@ from acis_browser import (
 pytestmark = pytest.mark.anyio
 
 A_NUMBER = "999999999"
-HEADERS = {"x-api-key": "test-secret"}
+HEADERS = {"x-api-key": "owner-test-secret"}
 
 
 async def lookup(client, body, headers=HEADERS):
@@ -46,6 +47,25 @@ async def test_wrong_secret_is_rejected(client):
         headers={"x-api-key": "nope"},
     )
     assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("key", "tenant"),
+    [("owner-test-secret", "owner"), ("metered-test-secret", "metered")],
+)
+async def test_api_key_resolves_tenant_in_lookup_logs(client, key, tenant):
+    with structlog.testing.capture_logs(
+        processors=[structlog.contextvars.merge_contextvars]
+    ) as logs:
+        response = await lookup(
+            client,
+            {"a_number": A_NUMBER, "nationality": "VE"},
+            headers={"x-api-key": key},
+        )
+    assert response.status_code == 200
+    lookup_events = [e for e in logs if e["event"].startswith("lookup.")]
+    assert lookup_events
+    assert all(e["tenant"] == tenant for e in lookup_events)
 
 
 async def test_auth_is_checked_before_any_lookup(client, browser):
@@ -120,6 +140,13 @@ async def test_missing_a_number_returns_400(client):
 async def test_wrong_field_type_returns_400(client):
     response = await lookup(
         client, {"a_number": A_NUMBER, "nationality": "VE", "refresh": "maybe"}
+    )
+    assert response.status_code == 400
+
+
+async def test_unknown_field_returns_400(client):
+    response = await lookup(
+        client, {"a_number": A_NUMBER, "nationality": "VE", "nat": "VE"}
     )
     assert response.status_code == 400
 

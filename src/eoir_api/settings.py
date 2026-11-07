@@ -1,19 +1,23 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import tomllib
 from collections import Counter
 from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import msgspec
 from platformdirs import user_config_path, user_data_path
 
 from eoir_api.exceptions import ConfigurationError
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 CONFIG_ENV_VAR = "EOIR_API_CONFIG"
-DEFAULT_CONFIG_PATH = user_config_path("eoir-api") / "config.toml"
-DEFAULT_PROFILES_DIR = user_data_path("eoir-api") / "profiles"
+DEBUG_ENV_VAR = "EOIR_API_DEBUG"
+MIN_KEY_LENGTH = 16
 
 
 class Secret(str):
@@ -35,7 +39,7 @@ class Server(_Base):
 
 
 class Chrome(_Base):
-    profiles_dir: Path = DEFAULT_PROFILES_DIR
+    profiles_dir: Path = user_data_path("eoir-api") / "profiles"
     """Parent of one persistent Chrome profile per browser."""
     idle_timeout: int = 900
     """Seconds of inactivity before a browser is torn down."""
@@ -58,6 +62,25 @@ class Lookup(_Base):
     """Beyond this, return 429 instead of holding the connection."""
 
 
+class Usage(_Base):
+    db_path: Path = user_data_path("eoir-api") / "usage.sqlite"
+    retention_days: Annotated[int, msgspec.Meta(ge=1)] = 30
+
+
+class Portal(_Base):
+    secret: Secret
+    """Session secret."""
+
+    def __post_init__(self) -> None:
+        if not self.secret:
+            raise ValueError("portal secret must not be empty")
+
+    @property
+    def session_key(self) -> bytes:
+        """Return the 32-byte AES-GCM key for the session cookie."""
+        return hashlib.sha256(f"session:{self.secret}".encode()).digest()
+
+
 class Sentry(_Base):
     dsn: Secret = Secret("")
     environment: str = ""
@@ -69,30 +92,43 @@ class Proxy(_Base):
     password: Secret | None = None
 
 
+SafeName = Annotated[str, msgspec.Meta(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")]
+
+
 class Browser(_Base):
     # Also the profile dir name, so it must be a safe single path segment
-    name: Annotated[str, msgspec.Meta(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")]
+    name: SafeName
     proxy: Proxy | None = None
     group: Annotated[str, msgspec.Meta(min_length=1)] | None = None
 
 
+class Tenant(_Base):
+    name: SafeName
+    key: Secret
+    """Value the tenant sends in the ``x-api-key`` header."""
+    quota_per_day: Annotated[int, msgspec.Meta(ge=1)] | None = None
+    """Lookups allowed per rolling 24h. Unset means unlimited."""
+
+    def __post_init__(self) -> None:
+        if len(self.key) < MIN_KEY_LENGTH:
+            raise ValueError(f"tenant key must be at least {MIN_KEY_LENGTH} characters")
+
+
 class Settings(_Base):
-    api_secret: Secret
-    """Secret required in the ``x-api-key`` header."""
+    tenants: Annotated[list[Tenant], msgspec.Meta(min_length=1)]
+    portal: Portal | None = None
     debug: bool = False
     server: Server = msgspec.field(default_factory=Server)
     chrome: Chrome = msgspec.field(default_factory=Chrome)
     lookup: Lookup = msgspec.field(default_factory=Lookup)
+    usage: Usage = msgspec.field(default_factory=Usage)
     sentry: Sentry = msgspec.field(default_factory=Sentry)
     browsers: Annotated[list[Browser], msgspec.Meta(min_length=1)] = msgspec.field(
         default_factory=lambda: [Browser(name="default")]
     )
 
     def __post_init__(self) -> None:
-        if not self.api_secret:
-            raise ValueError("api_secret must not be empty")
-        counts = Counter(b.name for b in self.browsers)
-        if dupes := sorted(n for n, c in counts.items() if c > 1):
+        if dupes := duplicates(b.name for b in self.browsers):
             raise ValueError(f"duplicate browser names: {', '.join(dupes)}")
 
     @classmethod
@@ -107,29 +143,34 @@ class Settings(_Base):
             raise ConfigurationError(f"Invalid TOML in {path}: {exc}") from exc
         try:
             return msgspec.convert(
-                _resolve_refs(raw, "$"), cls, strict=False, dec_hook=_dec_hook
+                resolve_refs(raw, "$"), cls, strict=False, dec_hook=dec_hook
             )
         except msgspec.ValidationError as exc:
             raise ConfigurationError(f"Invalid config {path}: {exc}") from exc
 
 
+def duplicates(values: Iterable[str]) -> list[str]:
+    return sorted(v for v, c in Counter(values).items() if c > 1)
+
+
 def find_config(path: Path | None = None) -> Path:
     """Return the config path: ``path``, then ``$EOIR_API_CONFIG``, then the default."""
+    default = user_config_path("eoir-api") / "config.toml"
     if path is None:
         env = os.environ.get(CONFIG_ENV_VAR)
-        path = Path(env) if env else DEFAULT_CONFIG_PATH
+        path = Path(env) if env else default
     if not path.is_file():
         raise ConfigurationError(
             f"Config file not found: {path} "
-            f"(set with --config or {CONFIG_ENV_VAR}; default {DEFAULT_CONFIG_PATH})"
+            f"(set with --config or {CONFIG_ENV_VAR}; default {default})"
         )
     return path
 
 
-def _resolve_refs(value: Any, key: str) -> Any:
+def resolve_refs(value: Any, key: str) -> Any:
     """Replace ``{ env = "X" }`` / ``{ file = "/path" }`` refs with their values."""
     if isinstance(value, list):
-        return [_resolve_refs(v, f"{key}[{i}]") for i, v in enumerate(value)]
+        return [resolve_refs(v, f"{key}[{i}]") for i, v in enumerate(value)]
     if not isinstance(value, dict):
         return value
     if value.keys() == {"env"}:
@@ -144,10 +185,10 @@ def _resolve_refs(value: Any, key: str) -> Any:
             raise ConfigurationError(
                 f"{key}: cannot read {value['file']}: {exc.strerror}"
             ) from exc
-    return {k: _resolve_refs(v, f"{key}.{k}") for k, v in value.items()}
+    return {k: resolve_refs(v, f"{key}.{k}") for k, v in value.items()}
 
 
-def _dec_hook(type_: type, obj: Any) -> Any:
+def dec_hook(type_: type, obj: Any) -> Any:
     if type_ is Secret and isinstance(obj, str):
         return Secret(obj)
     if type_ is Path and isinstance(obj, str):

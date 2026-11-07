@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block main %}
+  <h1>Sign in</h1>
+  <form class="login flow" method="post" action="/portal/login">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="stack">
+      <label for="key"><strong>API key</strong></label>
+      <input id="key" name="key" type="password" class="field field-key" required autofocus>
+    </div>
+    {% if error %}<p class="alert">{{ error }}</p>{% endif %}
+    <div>
+      <button type="submit" class="btn btn-primary">Continue</button>
+    </div>
+  </form>
+{% endblock %}
