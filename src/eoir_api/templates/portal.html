@@ -3,7 +3,7 @@
   <div class="stat">
     <span class="muted">Past 24 hours</span>
     <strong>{{ "{:,}".format(usage.used) }}{% if usage.quota %} / {{ "{:,}".format(usage.quota.limit) }}{% endif %}</strong>
-    <span class="muted">lookups</span>
+    <span class="muted">lookup{{ "" if usage.used == 1 and not usage.quota else "s" }}</span>
   </div>
 
   <section class="flow">
