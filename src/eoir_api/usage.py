@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Literal
 
 import msgspec
-from acis_core.a_numbers import redact
 from sqlspec import SQLFileLoader
 from sqlspec.adapters.aiosqlite import AiosqliteConfig, AiosqliteDriver
 from sqlspec.service import SQLSpecAsyncService
@@ -35,7 +34,7 @@ queries.load_sql(Path(__file__).parent / "sql" / "usage.sql")
 
 class LookupItem(msgspec.Struct):
     ts: dt.datetime
-    a_number_redacted: str
+    a_number_last_4: str
     outcome: LookupOutcome
     cached: bool
     duration_ms: int | None
@@ -97,7 +96,7 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
                 queries.get_sql("record_lookup"),
                 tenant,
                 iso(ts),
-                redact(a_number),
+                a_number[-4:],
                 outcome,
                 int(cached),
                 duration_ms,
