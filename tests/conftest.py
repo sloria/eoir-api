@@ -136,7 +136,7 @@ class LookupRow(msgspec.Struct):
     id: int
     tenant: str
     ts: dt.datetime
-    a_number_redacted: str
+    a_number_last_4: str
     outcome: LookupOutcome
     cached: int
     duration_ms: int | None

@@ -3,7 +3,7 @@ CREATE TABLE lookups (
     id INTEGER PRIMARY KEY,
     tenant TEXT NOT NULL,
     ts TEXT NOT NULL, -- ISO 8601 UTC
-    a_number_redacted TEXT NOT NULL,
+    a_number_last_4 TEXT NOT NULL,
     outcome TEXT NOT NULL,
     cached INTEGER NOT NULL,
     duration_ms INTEGER -- NULL for cache hits

@@ -28,7 +28,7 @@
         <tbody>
           {% for item in items %}
             <tr>
-              <td>{{ item.a_number_redacted }}</td>
+              <td>{{ item.a_number_last_4.rjust(9, "*") }}</td>
               <td class="{{ item.outcome | status_class }}">
                 {{ item.outcome | outcome_label }}{% if item.cached %} <span class="muted">(cached)</span>{% endif %}
               </td>
