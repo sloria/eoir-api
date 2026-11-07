@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Annotated
 
 import msgspec
@@ -30,9 +31,13 @@ from litestar.status_codes import (
     HTTP_502_BAD_GATEWAY,
 )
 
-from eoir_api.exceptions import BrowserUnavailableError, QueueTimeoutError
-from eoir_api.guards import require_api_key
+from eoir_api.exceptions import (
+    BrowserUnavailableError,
+    QueueTimeoutError,
+    QuotaExceededError,
+)
 from eoir_api.service import Case, CaseService
+from eoir_api.usage import Quota, TenantUsage
 
 logger = structlog.get_logger()
 
@@ -48,7 +53,7 @@ class BadGatewayException(HTTPException):
     status_code = HTTP_502_BAD_GATEWAY
 
 
-class CaseLookup(msgspec.Struct):
+class CaseLookup(msgspec.Struct, forbid_unknown_fields=True):
     a_number: str
     nationality: Annotated[
         str,
@@ -67,8 +72,18 @@ class CaseLookup(msgspec.Struct):
 UNAVAILABLE_DETAIL = "Lookup temporarily unavailable. Retry later."
 
 
-def _retry_after(seconds: float) -> dict[str, str]:
+def retry_after_header(seconds: float) -> dict[str, str]:
     return {"Retry-After": str(max(1, round(seconds)))}
+
+
+def rate_limit_headers(quota: Quota | None) -> dict[str, str]:
+    if quota is None:
+        return {}
+    return {
+        "X-RateLimit-Limit": str(quota.limit),
+        "X-RateLimit-Remaining": str(quota.remaining),
+        "X-RateLimit-Reset": str(math.ceil(quota.reset_at.timestamp())),
+    }
 
 
 @get("/healthz", media_type="text/plain", include_in_schema=False, sync_to_thread=False)
@@ -79,11 +94,11 @@ def health() -> Response:
 @post(
     "/cases/lookup",
     status_code=HTTP_200_OK,
-    guards=[require_api_key],
     raises=[
         NotFoundException,
         UnprocessableContentException,
         TooManyRequestsException,
+        BadGatewayException,
         ServiceUnavailableException,
         BadGatewayException,
     ],
@@ -92,8 +107,23 @@ async def lookup_case(
     *,
     data: JSONBody[CaseLookup],
     service: NamedDependency[CaseService],
-) -> Case:
+    usage: NamedDependency[TenantUsage],
+) -> Response[Case]:
     """Look up current case information for an A-Number and nationality."""
+    try:
+        case = await fetch_case(service, usage, data)
+    except HTTPException as exc:
+        exc.headers = {
+            **(exc.headers or {}),
+            **rate_limit_headers(await usage.quota()),
+        }
+        raise
+    return Response(case, headers=rate_limit_headers(await usage.quota()))
+
+
+async def fetch_case(
+    service: CaseService, usage: TenantUsage, data: CaseLookup
+) -> Case:
     try:
         cleaned = normalize_a_number(data.a_number)
     except InvalidANumberError as exc:
@@ -106,7 +136,9 @@ async def lookup_case(
 
     log = logger.bind(a_number=redact(cleaned), nat_code=resolved.code)
     try:
-        return await service.get_case(cleaned, resolved, refresh=data.refresh)
+        return await service.get_case(
+            cleaned, resolved, usage=usage, refresh=data.refresh
+        )
     except CaseNotFoundError as exc:
         log.info("case.not_found")
         raise NotFoundException("No case found for that A-Number.") from exc
@@ -118,26 +150,32 @@ async def lookup_case(
     except CaseUnavailableError as exc:
         log.info("case.unavailable")
         raise UnprocessableContentException(str(exc)) from exc
+    except QuotaExceededError as exc:
+        raise TooManyRequestsException(
+            "Daily quota exceeded",
+            headers=retry_after_header(exc.retry_after),
+            extra={"reason": "quota_exceeded"},
+        ) from exc
     except QueueTimeoutError as exc:
         log.info("case.queue_full", error=str(exc))
         raise TooManyRequestsException(
             "Too many pending lookups. Retry later.",
-            headers=_retry_after(service.avg_lookup_seconds),
+            headers=retry_after_header(service.avg_lookup_seconds),
         ) from exc
     except CaptchaError as exc:
         log.warning("case.captcha_error", reason=exc.reason)
         raise ServiceUnavailableException(
-            UNAVAILABLE_DETAIL, headers=_retry_after(service.retry_after)
+            UNAVAILABLE_DETAIL, headers=retry_after_header(service.retry_after)
         ) from exc
     except BrowserUnavailableError as exc:
         log.info("case.browsers_unavailable", retry_after=round(exc.retry_after))
         raise ServiceUnavailableException(
-            UNAVAILABLE_DETAIL, headers=_retry_after(exc.retry_after)
+            UNAVAILABLE_DETAIL, headers=retry_after_header(exc.retry_after)
         ) from exc
     except BrowserLostError as exc:
         log.warning("case.browser_lost", error=str(exc))
         raise ServiceUnavailableException(
-            UNAVAILABLE_DETAIL, headers=_retry_after(1)
+            UNAVAILABLE_DETAIL, headers=retry_after_header(1)
         ) from exc
     except UpstreamError as exc:
         log.warning("case.upstream_error", error=str(exc))

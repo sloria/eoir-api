@@ -1,17 +1,15 @@
 # EOIR API
 
-An API for <https://acis.eoir.justice.gov>. Not official, for personal use only.
+An API for <https://acis.eoir.justice.gov>. Not official.
 
 ## Warning: no public access
 
 I run my own instance of this, but access is closed. If you need this for your own automation projects, you'll need to host this on your own.
 
-This isn't built for scale. It's meant to run as a single process with headed Chrome (headless won't work). Concurrent requests are queued. Lookups are pretty slow (several seconds).
-
 ## Usage
 
 ```bash
-curl -H "x-api-key: $API_SECRET" \
+curl -H "x-api-key: $API_KEY" \
   --json '{"a_number": "123456789", "nationality": "venezuela"}' \
   http://127.0.0.1:8001/cases/lookup
 ```
@@ -63,15 +61,16 @@ Initial setup:
 
 ```
 mise setup
-# creates config.toml from config.example.toml; set api_secret there or export API_SECRET
 ```
+
+This creates `config.toml` and `.env`. Fill in API_KEY and PORTAL_SECRET in .env
 
 All settings are documented in [config.example.toml](config.example.toml).
 
 Run the dev server:
 
 ```
-mise serve
+mise dev
 ```
 
 Tests and linting:

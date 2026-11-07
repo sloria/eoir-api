@@ -16,3 +16,11 @@ class BrowserUnavailableError(EoirApiError):
     def __init__(self, message: str, *, retry_after: float) -> None:
         super().__init__(message)
         self.retry_after = retry_after
+
+
+class QuotaExceededError(EoirApiError):
+    """Raised when a tenant has used up its lookup quota."""
+
+    def __init__(self, message: str, *, retry_after: float) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after

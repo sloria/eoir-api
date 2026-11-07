@@ -12,17 +12,29 @@ from typing import Any, Protocol
 import anyio
 import msgspec
 import structlog
-from acis_browser import CaptchaError, Outcome, raise_for_outcome
+from acis_browser import (
+    CaptchaError,
+    CaseNotFoundError,
+    CaseUnavailableError,
+    InvalidNationalityError,
+    Outcome,
+    raise_for_outcome,
+)
 from acis_core.nationalities import Nationality
 
-from eoir_api.exceptions import BrowserUnavailableError, QueueTimeoutError
+from eoir_api.exceptions import (
+    BrowserUnavailableError,
+    QueueTimeoutError,
+    QuotaExceededError,
+)
 from eoir_api.lib.cache import TTLCache
 from eoir_api.settings import Settings
+from eoir_api.usage import LookupOutcome, TenantUsage
 
 logger = structlog.get_logger()
 
 # Weight for the exponential moving average of lookup duration.
-_EWMA_ALPHA = 0.3
+EWMA_ALPHA = 0.3
 
 
 class SupportsLookup(Protocol):
@@ -32,7 +44,7 @@ class SupportsLookup(Protocol):
 
 
 @dataclass(eq=False)  # eq=False to make slots hashable (usable in a set)
-class _BrowserSlot:
+class BrowserSlot:
     """Container for a browser and its pacing state."""
 
     name: str
@@ -44,6 +56,20 @@ class _BrowserSlot:
 
     def in_cooldown(self, now: float) -> bool:
         return now < self.cooldown_until
+
+
+OUTCOMES: dict[type[Exception], LookupOutcome] = {
+    CaseNotFoundError: "not_found",
+    InvalidNationalityError: "invalid_nationality",
+    CaseUnavailableError: "unavailable",
+    CaptchaError: "captcha",
+    # Every browser left is cooling down after a captcha failure
+    BrowserUnavailableError: "captcha",
+}
+
+
+def outcome_of(exc: Exception) -> LookupOutcome:
+    return OUTCOMES.get(type(exc), "upstream_error")
 
 
 class Case(msgspec.Struct):
@@ -74,7 +100,7 @@ class CaseService:
         )
         groups = {b.name: b.group for b in self.settings.browsers}
         self._slots = [
-            _BrowserSlot(name, b, groups.get(name)) for name, b in self.browsers.items()
+            BrowserSlot(name, b, groups.get(name)) for name, b in self.browsers.items()
         ]
 
     @property
@@ -100,7 +126,7 @@ class CaseService:
             "No browser available for lookup.", retry_after=self.retry_after
         )
 
-    def _pick_browser(self, exclude: set[_BrowserSlot]) -> _BrowserSlot:
+    def _pick_browser(self, exclude: set[BrowserSlot]) -> BrowserSlot:
         now = self.clock()
         tried_groups = {slot.group for slot in exclude} - {None}
         candidates = [
@@ -122,8 +148,8 @@ class CaseService:
 
     async def _lookup(
         self, a_number: str, nationality: Nationality
-    ) -> tuple[dict[str, Any], _BrowserSlot, float]:
-        tried: set[_BrowserSlot] = set()
+    ) -> tuple[dict[str, Any], BrowserSlot, float]:
+        tried: set[BrowserSlot] = set()
         max_browsers = min(self.settings.lookup.max_browsers, len(self._slots))
         while True:
             slot = self._pick_browser(tried)
@@ -168,17 +194,31 @@ class CaseService:
                 finally:
                     duration = self.clock() - slot.last_started
                     self.avg_lookup_seconds = (
-                        _EWMA_ALPHA * duration
-                        + (1 - _EWMA_ALPHA) * self.avg_lookup_seconds
+                        EWMA_ALPHA * duration
+                        + (1 - EWMA_ALPHA) * self.avg_lookup_seconds
                     )
                 return payload, slot, duration
 
-    async def get_case(
-        self, a_number: str, nationality: Nationality, *, refresh: bool = False
-    ) -> Case:
-        """Return the case for an A-Number and nationality.
+    async def _check_quota(self, usage: TenantUsage) -> None:
+        quota = await usage.quota()
+        if quota is None or quota.remaining > 0:
+            return
+        retry_after = quota.reset_in()
+        logger.info("lookup.quota_exceeded", retry_after=retry_after)
+        raise QuotaExceededError("Daily quota exceeded", retry_after=retry_after)
 
-        Raises ``QueueTimeoutError`` if the request would wait too long and
+    async def get_case(
+        self,
+        a_number: str,
+        nationality: Nationality,
+        *,
+        usage: TenantUsage,
+        refresh: bool = False,
+    ) -> Case:
+        """Return the case for an A-Number and nationality, recording the lookup.
+
+        Raises ``QuotaExceededError`` if the tenant is out of quota,
+        ``QueueTimeoutError`` if the request would wait too long and
         ``BrowserUnavailableError`` if every browser is in a captcha cooldown.
         """
         key = (a_number, nationality.code)
@@ -186,6 +226,7 @@ class CaseService:
             entry = self._cache.get(key)
             if entry is not None:
                 logger.debug("lookup.cache_hit", nat_code=nationality.code)
+                await usage.record(a_number=a_number, outcome="ok", cached=True)
                 return Case(
                     a_number=a_number,
                     nationality=nationality,
@@ -194,6 +235,7 @@ class CaseService:
                     acis=entry.value,
                 )
 
+        await self._check_quota(usage)
         now = self.clock()
         if all(slot.in_cooldown(now) for slot in self._slots):
             raise self._unavailable()
@@ -206,30 +248,39 @@ class CaseService:
 
         self._pending += 1
         started = self.clock()
+        outcome: LookupOutcome = "ok"
         logger.info("lookup.start", nat_code=nationality.code, pending=self._pending)
         try:
             payload, slot, duration = await self._lookup(a_number, nationality)
+            upstream = Outcome.from_payload(payload)
+            if upstream is not Outcome.OK:
+                logger.info(
+                    "lookup.no_case",
+                    nat_code=nationality.code,
+                    browser=slot.name,
+                    group=slot.group,
+                    outcome=upstream,
+                )
+            raise_for_outcome(payload)
         except Exception as exc:
+            outcome = outcome_of(exc)
             logger.warning(
                 "lookup.failed",
                 nat_code=nationality.code,
                 error=type(exc).__name__,
+                outcome=outcome,
                 elapsed=round(self.clock() - started, 1),
             )
             raise
         finally:
             self._pending -= 1
-
-        outcome = Outcome.from_payload(payload)
-        if outcome is not Outcome.OK:
-            logger.info(
-                "lookup.no_case",
-                nat_code=nationality.code,
-                browser=slot.name,
-                group=slot.group,
+            await usage.record(
+                a_number=a_number,
                 outcome=outcome,
+                cached=False,
+                duration_ms=round((self.clock() - started) * 1000),
             )
-        raise_for_outcome(payload)
+
         entry = self._cache.set(key, payload)
         logger.info(
             "lookup.success",

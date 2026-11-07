@@ -1,9 +1,17 @@
-# eoir-config. Values shown are defaults.
+# Values shown are defaults.
 
-# Shared secret required in the `x-api-key` header. Generate with: openssl rand -hex 32
-api_secret = { env = "API_SECRET" }
-# Litestar debug mode
 debug = false
+
+[[tenants]]
+name = "owner"
+key = { env = "API_KEY" }
+# Lookups allowed per rolling 24 hours (>= 1). Omit for unlimited.
+# quota_per_day = 2000
+
+# Tenant portal at /portal. Remove this section to disable it.
+[portal]
+# Encrypts the portal's cookie.
+secret = { env = "PORTAL_SECRET" }
 
 [server]
 host = "127.0.0.1"
@@ -40,6 +48,13 @@ name = "default"
 # proxy = { server = "socks5://127.0.0.1:1080", username = { env = "PROXY_USER" }, password = { env = "PROXY_PASS" } }
 # Optional. Retries after a captcha prefer another group.
 # group = "provider-a"
+
+[usage]
+# SQLite file recording tenant usage.
+# Default: platform user data dir, e.g. on macOS:
+# db_path = "~/Library/Application Support/eoir-api/usage.sqlite"
+# Days to keep lookup records
+retention_days = 30
 
 [sentry]
 # Sentry DSN; empty disables Sentry. e.g. { env = "SENTRY_DSN" }
