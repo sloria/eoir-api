@@ -1,3 +1,6 @@
+[env]
+_.file = ".env"
+
 [tools]
 uv = "latest"
 prek = "latest"
@@ -6,6 +9,7 @@ prek = "latest"
 description = "Set up the development environment"
 run = """
 test -f config.toml || cp config.example.toml config.toml
+test -f .env || cp .env.example .env
 uv sync --all-packages --all-groups
 uv run patchright install chrome
 prek install -f
@@ -27,9 +31,9 @@ run = "uv run pytest"
 description = "Run live browser tests against the real ACIS site"
 run = "uv run pytest -m live"
 
-[tasks.serve]
+[tasks.dev]
 description = "Run the app server in development mode"
-run = "uv run eoir-api serve -c config.toml --reload"
+run = "uv run eoir-api serve -c config.toml --reload --debug"
 
 [tasks.start]
 description = "Run the production server"

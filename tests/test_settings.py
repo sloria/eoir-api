@@ -15,21 +15,26 @@ from eoir_api.settings import (
 )
 
 EXAMPLE_CONFIG = Path(__file__).parent.parent / "config.example.toml"
+PORTAL = 'portal = { secret = "p" }'
+TENANT = 'tenants = [{ name = "owner", key = "owner-test-secret" }]'
 
 
 @pytest.fixture
 def write_config(tmp_path):
-    def write(text: str) -> Path:
+    def write(text: str, *, portal: bool = True) -> Path:
         path = tmp_path / "config.toml"
-        path.write_text(text)
+        path.write_text(f"{PORTAL}\n{text}" if portal else text)
         return path
 
     return write
 
 
 def test_load_minimal_config_uses_defaults(write_config):
-    settings = Settings.load(write_config('api_secret = "s3cret"'))
-    assert settings.api_secret == "s3cret"
+    settings = Settings.load(write_config(TENANT))
+    [tenant] = settings.tenants
+    assert tenant.name == "owner"
+    assert tenant.key == "owner-test-secret"
+    assert tenant.quota_per_day is None
     assert settings.server.port == 8001
     assert settings.lookup.attempts == 1
     assert [b.name for b in settings.browsers] == ["default"]
@@ -39,7 +44,14 @@ def test_load_minimal_config_uses_defaults(write_config):
 def test_load_nested_sections_and_browsers(write_config):
     settings = Settings.load(
         write_config("""
-api_secret = "s3cret"
+[[tenants]]
+name = "owner"
+key = "owner-test-secret"
+
+[[tenants]]
+name = "metered"
+key = "metered-test-secret"
+quota_per_day = 2000
 
 [lookup]
 interval = 5
@@ -52,6 +64,10 @@ name = "proxied-1"
 proxy = { server = "socks5://host-a:1081", username = "u", password = "p" }
 """)
     )
+    assert [(t.name, t.quota_per_day) for t in settings.tenants] == [
+        ("owner", None),
+        ("metered", 2000),
+    ]
     assert settings.lookup.interval == 5
     proxied = settings.browsers[1]
     assert proxied.name == "proxied-1"
@@ -61,23 +77,29 @@ proxy = { server = "socks5://host-a:1081", username = "u", password = "p" }
 
 
 def test_load_resolves_env_ref(write_config, monkeypatch):
-    monkeypatch.setenv("TEST_API_SECRET", "from-env")
-    settings = Settings.load(write_config('api_secret = { env = "TEST_API_SECRET" }'))
-    assert settings.api_secret == "from-env"
+    monkeypatch.setenv("TEST_API_KEY", "env-test-secret-key")
+    settings = Settings.load(
+        write_config('tenants = [{ name = "a", key = { env = "TEST_API_KEY" } }]')
+    )
+    assert settings.tenants[0].key == "env-test-secret-key"
 
 
 def test_load_resolves_file_ref_and_strips_trailing_newline(write_config, tmp_path):
     secret_file = tmp_path / "secret"
-    secret_file.write_text("from-file\n")
-    settings = Settings.load(write_config(f'api_secret = {{ file = "{secret_file}" }}'))
-    assert settings.api_secret == "from-file"
+    secret_file.write_text("file-test-secret-key\n")
+    settings = Settings.load(
+        write_config(
+            f'tenants = [{{ name = "a", key = {{ file = "{secret_file}" }} }}]'
+        )
+    )
+    assert settings.tenants[0].key == "file-test-secret-key"
 
 
 def test_load_resolves_refs_inside_browser_proxy(write_config, monkeypatch):
     monkeypatch.setenv("TEST_PROXY_PASS", "hunter2")
     settings = Settings.load(
         write_config("""
-api_secret = "s3cret"
+tenants = [{ name = "owner", key = "owner-test-secret" }]
 [[browsers]]
 name = "a"
 proxy = { server = "socks5://a:1", password = { env = "TEST_PROXY_PASS" } }
@@ -91,7 +113,7 @@ proxy = { server = "socks5://a:1", password = { env = "TEST_PROXY_PASS" } }
 def test_load_env_ref_coerces_to_field_type(write_config, monkeypatch):
     monkeypatch.setenv("TEST_PORT", "9000")
     settings = Settings.load(
-        write_config('api_secret = "s"\n[server]\nport = { env = "TEST_PORT" }')
+        write_config(TENANT + '\n[server]\nport = { env = "TEST_PORT" }')
     )
     assert settings.server.port == 9000
 
@@ -99,23 +121,27 @@ def test_load_env_ref_coerces_to_field_type(write_config, monkeypatch):
 def test_load_unset_env_var_names_key_not_value(write_config, monkeypatch):
     monkeypatch.delenv("TEST_UNSET", raising=False)
     with pytest.raises(ConfigurationError, match=r"\$\.sentry\.dsn.*TEST_UNSET"):
-        Settings.load(
-            write_config('api_secret = "s"\n[sentry]\ndsn = { env = "TEST_UNSET" }')
-        )
+        Settings.load(write_config(TENANT + '\n[sentry]\ndsn = { env = "TEST_UNSET" }'))
 
 
 def test_load_missing_secret_file_names_key(write_config, tmp_path):
     missing = tmp_path / "nope"
-    with pytest.raises(ConfigurationError, match=r"\$\.api_secret"):
-        Settings.load(write_config(f'api_secret = {{ file = "{missing}" }}'))
+    with pytest.raises(ConfigurationError, match=r"\$\.tenants\[0\]\.key"):
+        Settings.load(
+            write_config(
+                f'tenants = [{{ name = "a", key = {{ file = "{missing}" }} }}]'
+            )
+        )
 
 
 @pytest.mark.parametrize(
     "text",
     [
-        'api_secret = "s"\nbogus = 1',
-        'api_secret = "s"\n[lookup]\nretries = 3',
-        'api_secret = "s"\n[[browsers]]\nname = "a"\nport = 1',
+        TENANT + "\nbogus = 1",
+        TENANT + '\napi_secret = "s"',
+        'tenants = [{ name = "a", key = "owner-test-secret", quota = 1 }]',
+        TENANT + "\n[lookup]\nretries = 3",
+        TENANT + '\n[[browsers]]\nname = "a"\nport = 1',
     ],
 )
 def test_load_rejects_unknown_keys(write_config, text):
@@ -127,7 +153,7 @@ def test_load_rejects_duplicate_browser_names(write_config):
     with pytest.raises(ConfigurationError, match="duplicate browser names: a"):
         Settings.load(
             write_config(
-                'api_secret = "s"\n[[browsers]]\nname = "a"\n[[browsers]]\nname = "a"'
+                TENANT + '\n[[browsers]]\nname = "a"\n[[browsers]]\nname = "a"'
             )
         )
 
@@ -135,17 +161,20 @@ def test_load_rejects_duplicate_browser_names(write_config):
 @pytest.mark.parametrize("name", ["", "..", ".hidden", "a/b", "a b"])
 def test_load_rejects_names_unsafe_as_directory(write_config, name):
     with pytest.raises(ConfigurationError, match=r"browsers\[0\]\.name"):
-        Settings.load(write_config(f'api_secret = "s"\n[[browsers]]\nname = "{name}"'))
+        Settings.load(write_config(TENANT + f'\n[[browsers]]\nname = "{name}"'))
 
 
 @pytest.mark.parametrize(
     "text",
     [
-        'api_secret = ""',
         "debug = true",
-        'api_secret = "s"\n[lookup]\nattempts = 0',
-        'api_secret = "s"\n[lookup]\nmax_browsers = 0',
-        'api_secret = "s"\nbrowsers = []',
+        "tenants = []",
+        'tenants = [{ name = "a", key = "" }]',
+        'tenants = [{ name = "a", key = "owner-test-secret", quota_per_day = 0 }]',
+        'tenants = [{ name = "a/b", key = "owner-test-secret" }]',
+        TENANT + "\n[lookup]\nattempts = 0",
+        TENANT + "\n[lookup]\nmax_browsers = 0",
+        TENANT + "\nbrowsers = []",
     ],
 )
 def test_load_rejects_invalid_values(write_config, text):
@@ -153,31 +182,57 @@ def test_load_rejects_invalid_values(write_config, text):
         Settings.load(write_config(text))
 
 
+def test_load_rejects_short_tenant_key(write_config):
+    with pytest.raises(ConfigurationError, match="at least 16 characters"):
+        Settings.load(write_config('tenants = [{ name = "a", key = "short" }]'))
+
+
+def test_load_rejects_empty_portal_secret(write_config):
+    with pytest.raises(ConfigurationError, match="must not be empty"):
+        Settings.load(
+            write_config(f'portal = {{ secret = "" }}\n{TENANT}', portal=False)
+        )
+
+
+def test_portal_is_optional(write_config):
+    assert Settings.load(write_config(TENANT, portal=False)).portal is None
+
+
 def test_load_invalid_toml_raises_configuration_error(write_config):
     with pytest.raises(ConfigurationError, match="Invalid TOML"):
-        Settings.load(write_config("api_secret = "))
+        Settings.load(write_config("debug = "))
 
 
 def test_load_expands_user_in_profiles_dir(write_config):
     settings = Settings.load(
-        write_config('api_secret = "s"\n[chrome]\nprofiles_dir = "~/profiles"')
+        write_config(TENANT + '\n[chrome]\nprofiles_dir = "~/profiles"')
     )
     assert settings.chrome.profiles_dir == Path.home() / "profiles"
 
 
 def test_secrets_are_redacted_in_repr(write_config):
     settings = Settings.load(
-        write_config("""
-api_secret = "top-secret"
+        write_config(
+            """
+tenants = [{ name = "owner", key = "top-secret-tenant-key" }]
+portal = { secret = "portal-secret" }
 [sentry]
 dsn = "https://key@sentry.example/1"
 [[browsers]]
 name = "a"
 proxy = { server = "socks5://a:1", username = "proxy-user", password = "proxy-pass" }
-""")
+""",
+            portal=False,
+        )
     )
     text = repr(settings)
-    for secret in ("top-secret", "key@sentry", "proxy-user", "proxy-pass"):
+    for secret in (
+        "top-secret-tenant-key",
+        "portal-secret",
+        "key@sentry",
+        "proxy-user",
+        "proxy-pass",
+    ):
         assert secret not in text
 
 
@@ -223,7 +278,8 @@ def _key_paths(table: dict[str, object], prefix: str = "") -> set[str]:
 
 
 def test_example_config_loads(monkeypatch):
-    monkeypatch.setenv("API_SECRET", "example")
+    monkeypatch.setenv("API_KEY", "example-test-secret")
+    monkeypatch.setenv("PORTAL_SECRET", "example")
     Settings.load(EXAMPLE_CONFIG)
 
 

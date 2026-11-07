@@ -21,3 +21,8 @@ async def test_schema_documents_lookup_body(client):
     schema = spec["components"]["schemas"][ref]
     assert set(schema["properties"]) == {"a_number", "nationality", "refresh"}
     assert set(schema["required"]) == {"a_number", "nationality"}
+
+
+async def test_schema_excludes_portal(client):
+    paths = (await client.get("/schema/openapi.json")).json()["paths"]
+    assert not any(p.startswith("/portal") for p in paths)

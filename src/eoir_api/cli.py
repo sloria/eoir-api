@@ -7,7 +7,7 @@ import click
 import uvicorn
 
 from eoir_api.exceptions import ConfigurationError
-from eoir_api.settings import CONFIG_ENV_VAR, Settings, find_config
+from eoir_api.settings import CONFIG_ENV_VAR, DEBUG_ENV_VAR, Settings, find_config
 
 
 @click.group()
@@ -26,8 +26,14 @@ def cli() -> None:
 @click.option("--host", help="Override [server] host.")
 @click.option("--port", type=int, help="Override [server] port.")
 @click.option("--reload", is_flag=True, help="Reload on code changes.")
+@click.option("--debug", is_flag=True, help="Litestar debug mode; overrides config.")
 def serve(
-    config_path: Path | None, host: str | None, port: int | None, *, reload: bool
+    config_path: Path | None,
+    host: str | None,
+    port: int | None,
+    *,
+    reload: bool,
+    debug: bool,
 ) -> None:
     """Run the API server."""
     try:
@@ -36,8 +42,10 @@ def serve(
     except ConfigurationError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    # Needed for the factory to load the config in the subprocess with --reload
+    # The factory reads these in the subprocess started by --reload
     os.environ[CONFIG_ENV_VAR] = str(path.resolve())
+    if debug:
+        os.environ[DEBUG_ENV_VAR] = "1"
     uvicorn.run(
         "eoir_api.asgi:app_from_env",
         factory=True,

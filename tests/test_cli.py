@@ -8,7 +8,7 @@ from litestar import Litestar
 
 from eoir_api.asgi import app_from_env
 from eoir_api.cli import cli
-from eoir_api.settings import CONFIG_ENV_VAR
+from eoir_api.settings import CONFIG_ENV_VAR, DEBUG_ENV_VAR
 
 
 @pytest.fixture
@@ -24,7 +24,8 @@ def uvicorn_calls(monkeypatch) -> list[tuple[Any, dict[str, Any]]]:
 def config_path(tmp_path):
     path = tmp_path / "config.toml"
     path.write_text(
-        f'api_secret = "s"\n[server]\nport = 9001\n[chrome]\nprofiles_dir = "{tmp_path}"'
+        'portal = { secret = "p" }\ntenants = [{ name = "owner", key = "owner-test-secret" }]\n'
+        f'[server]\nport = 9001\n[chrome]\nprofiles_dir = "{tmp_path}"'
     )
     return path
 
@@ -56,7 +57,9 @@ def test_serve_host_and_port_flags_override_config(
 
 def test_serve_invalid_config_fails_before_starting_server(tmp_path, uvicorn_calls):
     path = tmp_path / "config.toml"
-    path.write_text('api_secret = "s"\nbogus = 1')
+    path.write_text(
+        'tenants = [{ name = "owner", key = "owner-test-secret" }]\nbogus = 1'
+    )
     result = CliRunner().invoke(cli, ["serve", "-c", str(path)])
     assert result.exit_code != 0
     assert "unknown field" in result.output
@@ -66,3 +69,11 @@ def test_serve_invalid_config_fails_before_starting_server(tmp_path, uvicorn_cal
 def test_app_from_env_builds_app_from_config(config_path, monkeypatch):
     monkeypatch.setenv(CONFIG_ENV_VAR, str(config_path))
     assert isinstance(app_from_env(), Litestar)
+
+
+def test_debug_flag_enables_debug_in_factory(config_path, uvicorn_calls, monkeypatch):
+    monkeypatch.delenv(DEBUG_ENV_VAR, raising=False)
+    CliRunner().invoke(cli, ["serve", "-c", str(config_path)])
+    assert not app_from_env().debug
+    CliRunner().invoke(cli, ["serve", "-c", str(config_path), "--debug"])
+    assert app_from_env().debug
