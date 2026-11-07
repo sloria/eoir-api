@@ -5,9 +5,11 @@ import json
 from typing import Any
 
 import pytest
+from patchright._impl._errors import TargetClosedError
 from patchright.async_api import Error as PlaywrightError
 
 from acis_browser import (
+    BrowserLostError,
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
@@ -223,7 +225,7 @@ async def test_browser_lost_mid_lookup_is_converted_and_discards_the_context(
 
     acis_browser._close = fake_close
 
-    with pytest.raises(UpstreamError):
+    with pytest.raises(BrowserLostError):
         await lookup_with(acis_browser, fake_once)
     assert closed == [True]
 
@@ -242,9 +244,35 @@ async def test_dead_driver_transport_is_treated_as_browser_lost(acis_browser):
 
     acis_browser._close = fake_close
 
-    with pytest.raises(UpstreamError):
+    with pytest.raises(BrowserLostError):
         await lookup_with(acis_browser, fake_once)
     assert closed == [True]
+
+
+async def test_browser_closing_mid_page_load_is_browser_lost(acis_browser):
+    class Page:
+        def on(self, event, handler):
+            pass
+
+        async def goto(self, *args, **kwargs):
+            raise TargetClosedError
+
+        async def close(self):
+            raise TargetClosedError
+
+    class Context:
+        async def new_page(self):
+            return Page()
+
+    async def fake_close() -> None:
+        pass
+
+    acis_browser.start = fake_start
+    acis_browser._context = Context()
+    acis_browser._close = fake_close
+
+    with pytest.raises(BrowserLostError):
+        await acis_browser.lookup("012345678", "MX", "MEXICO")
 
 
 async def test_close_stops_playwright_when_context_close_fails(acis_browser):
@@ -279,7 +307,7 @@ async def test_browser_lost_is_not_retried_as_a_captcha(acis_browser):
 
     acis_browser._close = fake_close
 
-    with pytest.raises(UpstreamError):
+    with pytest.raises(BrowserLostError):
         await lookup_with(acis_browser, fake_once)
     assert len(calls) == 1
 
@@ -293,7 +321,7 @@ async def test_browser_lost_is_discarded_even_when_closing_it_fails(acis_browser
 
     acis_browser._close = fake_close
 
-    with pytest.raises(UpstreamError):
+    with pytest.raises(BrowserLostError):
         await lookup_with(acis_browser, fake_once)
 
 

@@ -5,6 +5,7 @@ from typing import Annotated
 import msgspec
 import structlog
 from acis_browser import (
+    BrowserLostError,
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
@@ -63,6 +64,9 @@ class CaseLookup(msgspec.Struct):
 ##### Route handlers #####
 
 
+UNAVAILABLE_DETAIL = "Lookup temporarily unavailable. Retry later."
+
+
 def _retry_after(seconds: float) -> dict[str, str]:
     return {"Retry-After": str(max(1, round(seconds)))}
 
@@ -81,6 +85,7 @@ def health() -> Response:
         UnprocessableContentException,
         TooManyRequestsException,
         ServiceUnavailableException,
+        BadGatewayException,
     ],
 )
 async def lookup_case(
@@ -114,24 +119,29 @@ async def lookup_case(
         log.info("case.unavailable")
         raise UnprocessableContentException(str(exc)) from exc
     except QueueTimeoutError as exc:
-        log.info("case.queue_full")
+        log.info("case.queue_full", error=str(exc))
         raise TooManyRequestsException(
-            str(exc), headers=_retry_after(service.avg_lookup_seconds)
+            "Too many pending lookups. Retry later.",
+            headers=_retry_after(service.avg_lookup_seconds),
         ) from exc
     except CaptchaError as exc:
         log.warning("case.captcha_error", reason=exc.reason)
         raise ServiceUnavailableException(
-            "Blocked by hCaptcha.",
-            headers=_retry_after(service.retry_after),
+            UNAVAILABLE_DETAIL, headers=_retry_after(service.retry_after)
         ) from exc
     except BrowserUnavailableError as exc:
         log.info("case.browsers_unavailable", retry_after=round(exc.retry_after))
         raise ServiceUnavailableException(
-            str(exc), headers=_retry_after(exc.retry_after)
+            UNAVAILABLE_DETAIL, headers=_retry_after(exc.retry_after)
+        ) from exc
+    except BrowserLostError as exc:
+        log.warning("case.browser_lost", error=str(exc))
+        raise ServiceUnavailableException(
+            UNAVAILABLE_DETAIL, headers=_retry_after(1)
         ) from exc
     except UpstreamError as exc:
         log.warning("case.upstream_error", error=str(exc))
-        raise BadGatewayException(f"Upstream error: {exc}") from exc
+        raise BadGatewayException("EOIR lookup failed.") from exc
 
 
 ROUTE_HANDLERS = [health, lookup_case]

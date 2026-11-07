@@ -5,6 +5,7 @@ from acis_core.outcome import Outcome
 
 from acis_browser.browser import AcisBrowser, raise_for_outcome
 from acis_browser.exceptions import (
+    BrowserLostError,
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
@@ -15,6 +16,7 @@ from acis_browser.exceptions import (
 __all__ = [
     "AcisBrowser",
     "AcisError",
+    "BrowserLostError",
     "CaptchaError",
     "CaseNotFoundError",
     "CaseUnavailableError",

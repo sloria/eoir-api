@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from acis_browser import (
+    BrowserLostError,
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
@@ -207,6 +208,13 @@ async def test_upstream_error_returns_502(client, browser):
     browser.error = UpstreamError("ACIS returned HTTP 500")
     response = await lookup(client, {"a_number": A_NUMBER, "nationality": "VE"})
     assert response.status_code == 502
+
+
+async def test_browser_lost_returns_503(client, browser):
+    browser.error = BrowserLostError("Chrome is no longer available")
+    response = await lookup(client, {"a_number": A_NUMBER, "nationality": "VE"})
+    assert response.status_code == 503
+    assert "Retry-After" in response.headers
 
 
 async def test_failures_are_never_served_from_cache(client, browser):
