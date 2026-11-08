@@ -7,6 +7,8 @@ name = "owner"
 key = { env = "API_KEY" }
 # Lookups allowed per rolling 24 hours (>= 1). Omit for unlimited.
 # quota_per_day = 2000
+# Concurrent lookups allowed before 429 (>= 1). Omit for no cap.
+# max_concurrency = 5
 
 # Tenant portal at /portal. Remove this section to disable it.
 [portal]

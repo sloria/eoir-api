@@ -127,6 +127,60 @@ async def test_pending_is_released_after_a_failure(usage, service, browser):
     assert service.pending == 0
 
 
+##### Tenant max_concurrency #####
+
+
+def hold_lookups(browser) -> tuple[anyio.Event, anyio.Event]:
+    started, release = anyio.Event(), anyio.Event()
+    lookup = browser.lookup
+
+    async def held(*args):
+        started.set()
+        await release.wait()
+        return await lookup(*args)
+
+    browser.lookup = held  # type: ignore[method-assign]
+    return started, release
+
+
+@pytest.fixture
+def maxed(usage_service) -> TenantUsage:
+    return TenantUsage(
+        usage_service,
+        Tenant(name="capped", key=Secret("capped-test-secret"), max_concurrency=1),
+    )
+
+
+async def test_max_concurrency_is_released_after_a_lookup_fails(
+    maxed, service, browser
+):
+    browser.error = CaptchaError("boom", reason=CaptchaError.Reason.NO_RESPONSE)
+    with pytest.raises(CaptchaError):
+        await service.get_case(A_NUMBER, VE, usage=maxed)
+
+    browser.error = None
+    result = await service.get_case(A_NUMBER, VE, usage=maxed)
+    assert result.cached is False
+
+
+async def test_cache_hit_is_served_to_a_tenant_at_max_concurrency(
+    maxed, service, browser
+):
+    await service.get_case(A_NUMBER, VE, usage=maxed)
+    started, release = hold_lookups(browser)
+
+    async def in_flight() -> None:
+        await service.get_case("100000001", VE, usage=maxed)
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(in_flight)
+        await started.wait()
+        result = await service.get_case(A_NUMBER, VE, usage=maxed)
+        release.set()
+
+    assert result.cached is True
+
+
 ##### Browser dispatch #####
 
 
@@ -271,15 +325,8 @@ async def test_captcha_with_other_browser_in_cooldown_reports_its_retry_after(
 async def test_lookup_waiting_on_a_lock_skips_a_browser_that_entered_cooldown(
     usage, service, browser, settings, clock
 ):
-    started = anyio.Event()
-    release = anyio.Event()
-
-    async def slow_captcha(*_args):
-        started.set()
-        await release.wait()
-        raise CAPTCHA
-
-    browser.lookup = slow_captcha  # type: ignore[method-assign]
+    browser.error = CAPTCHA
+    started, release = hold_lookups(browser)
     outcomes: list[type[Exception]] = []
 
     async def request(a_number: str) -> None:

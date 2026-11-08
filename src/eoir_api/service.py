@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt  # noqa: TC003
 import math
 import time
+from collections import Counter
 from collections.abc import Callable, Mapping  # noqa: TC003
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -90,6 +91,7 @@ class CaseService:
 
     avg_lookup_seconds: float = field(default=10.0, init=False)
     _pending: int = field(default=0, init=False)
+    _tenant_pending: Counter[str] = field(default_factory=Counter, init=False)
 
     def __post_init__(self) -> None:
         # Not a dataclass field: msgspec resolves field annotations when Litestar
@@ -228,7 +230,8 @@ class CaseService:
         """Return the case for an A-Number and nationality, recording the lookup.
 
         Raises ``QuotaExceededError`` if the tenant is out of quota,
-        ``QueueTimeoutError`` if the request would wait too long and
+        ``QueueTimeoutError`` if the tenant is at its concurrency cap or the request
+        would wait too long and
         ``BrowserUnavailableError`` if every browser is in a captcha cooldown.
         """
         key = (a_number, nationality.code)
@@ -246,6 +249,16 @@ class CaseService:
                 )
 
         await self._check_quota(usage)
+        tenant = usage.tenant
+        max_concurrency = tenant.max_concurrency
+        if (
+            max_concurrency is not None
+            and self._tenant_pending[tenant.name] >= max_concurrency
+        ):
+            raise QueueTimeoutError(
+                f"Tenant max_concurrency of {max_concurrency} reached",
+                max_concurrency=max_concurrency,
+            )
         now = self.clock()
         if all(slot.in_cooldown(now) for slot in self._slots):
             raise self._unavailable()
@@ -257,6 +270,7 @@ class CaseService:
             )
 
         self._pending += 1
+        self._tenant_pending[tenant.name] += 1
         started = self.clock()
         outcome: LookupOutcome = "ok"
         logger.info("lookup.start", nat_code=nationality.code, pending=self._pending)
@@ -284,6 +298,7 @@ class CaseService:
             raise
         finally:
             self._pending -= 1
+            self._tenant_pending[tenant.name] -= 1
             await usage.record(
                 a_number=a_number,
                 outcome=outcome,

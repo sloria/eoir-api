@@ -7,7 +7,11 @@ class ConfigurationError(EoirApiError):
 
 
 class QueueTimeoutError(EoirApiError):
-    """Raised when a request would wait too long behind the browser lock."""
+    """Raised when a request would wait too long or its tenant is at its cap."""
+
+    def __init__(self, message: str, *, max_concurrency: int | None = None) -> None:
+        super().__init__(message)
+        self.max_concurrency = max_concurrency
 
 
 class BrowserUnavailableError(EoirApiError):
