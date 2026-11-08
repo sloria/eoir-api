@@ -1,0 +1,62 @@
+/* Portal variable values from base.html mapped onto Scalar's variables */
+
+.light-mode {
+  --scalar-color-1: #444;
+  --scalar-color-2: #787878;
+  --scalar-color-3: #787878;
+  --scalar-color-accent: #1853bb;
+
+  --scalar-background-1: #fff;
+  --scalar-background-2: #f3f2f2;
+  --scalar-background-3: #e6e5e5;
+  --scalar-background-accent: rgb(24 83 187 / 12%);
+
+  --scalar-border-color: rgb(68 68 68 / 25%);
+
+  --scalar-color-green: #155724;
+  --scalar-color-red: #721c24;
+  --scalar-color-yellow: #856404;
+  --scalar-color-blue: #1853bb;
+}
+
+.dark-mode {
+  --scalar-color-1: #e0e0e0;
+  --scalar-color-2: #b0b0b0;
+  --scalar-color-3: #b0b0b0;
+  --scalar-color-accent: #4d8aff;
+
+  --scalar-background-1: #181a1b;
+  --scalar-background-2: #242728;
+  --scalar-background-3: #303435;
+  --scalar-background-accent: rgb(77 138 255 / 15%);
+
+  --scalar-border-color: rgb(224 224 224 / 25%);
+
+  --scalar-color-green: #c3e6cb;
+  --scalar-color-red: #f5c6cb;
+  --scalar-color-yellow: #ffeaa7;
+  --scalar-color-blue: #4d8aff;
+}
+
+.light-mode,
+.dark-mode {
+  --scalar-font: ui-sans-serif, system-ui, sans-serif;
+  --scalar-font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --scalar-link-color: var(--scalar-color-accent);
+  --scalar-button-1: var(--scalar-color-accent);
+  --scalar-button-1-color: #fff;
+  --scalar-button-1-hover: color-mix(in srgb, var(--scalar-color-accent) 85%, #000);
+
+  --scalar-sidebar-background-1: var(--scalar-background-1);
+  --scalar-sidebar-border-color: var(--scalar-border-color);
+  --scalar-sidebar-color-1: var(--scalar-color-1);
+  --scalar-sidebar-color-2: var(--scalar-color-2);
+  --scalar-sidebar-color-active: var(--scalar-color-accent);
+  --scalar-sidebar-item-hover-color: currentColor;
+  --scalar-sidebar-item-hover-background: var(--scalar-background-2);
+  --scalar-sidebar-item-active-background: var(--scalar-background-accent);
+  --scalar-sidebar-search-background: transparent;
+  --scalar-sidebar-search-border-color: var(--scalar-border-color);
+  --scalar-sidebar-search-color: var(--scalar-color-3);
+}

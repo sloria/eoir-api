@@ -31,6 +31,7 @@ from litestar.openapi.plugins import ScalarRenderPlugin
 from litestar.openapi.spec import Components, SecurityScheme
 from litestar.plugins.jinja import JinjaTemplateEngine
 from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
+from litestar.static_files import create_static_files_router
 from litestar.template import TemplateConfig
 from sentry_sdk.integrations.litestar import LitestarIntegration
 from sqlspec import SQLSpec
@@ -54,6 +55,7 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 HERE = Path(__file__).parent
+SCHEMA_ASSETS_PATH = "/schema/assets"
 
 
 ##### Lifecycle hooks #####
@@ -126,19 +128,45 @@ def make_usage_lifespan(
 ##### App factory #####
 
 
+API_DESCRIPTION = """\
+Look up immigration court case information from EOIR's [Automated Case Information System (ACIS)](https://acis.eoir.justice.gov/).
+
+Authenticate by sending your API key in the `x-api-key` header.
+
+## Retrying
+
+Lookups run against a slow upstream with limited capacity. `429` and `503` responses are expected in normal operation, so clients must handle them.
+
+**Always honor `Retry-After`.** Wait at least that long before sending the request again.
+
+A `429` usually means too many lookups are pending, and the wait is typically seconds. If `extra.reason` is `quota_exceeded`, your daily quota is used up, and the wait can be hours. A `503` means lookups are temporarily unavailable, and the wait can be seconds to minutes.
+
+## Quota
+
+Your key has a quota over a rolling 24-hour window. Check your usage in the [API Portal](/portal).
+
+## Caching
+
+Successful results are cached for a few hours. Check `cached` and `retrieved_at` in the response. Set `refresh` to `true` to force a fresh lookup, which counts against quota.
+"""
+
+
 def create_openapi_config() -> OpenAPIConfig:
     return OpenAPIConfig(
         title="EOIR Automated Case Information (ACIS) API",
+        description=API_DESCRIPTION,
         version=importlib.metadata.version("eoir-api"),
         use_handler_docstrings=True,
         render_plugins=[
             ScalarRenderPlugin(
+                css_url=f"{SCHEMA_ASSETS_PATH}/scalar.css",
                 options={
                     "agent": {"disabled": True},
                     "showToolbar": "never",
                     "mcp": {"disabled": True},
                     "hideClientButton": True,
-                }
+                    "withDefaultFonts": False,
+                },
             )
         ],
         components=Components(
@@ -255,7 +283,12 @@ def build_app(
     async def provide_usage(request: Request[Tenant, Any, State]) -> TenantUsage:
         return TenantUsage(usage_service, request.user)
 
-    route_handlers: list[Any] = [*ROUTE_HANDLERS]
+    route_handlers: list[Any] = [
+        *ROUTE_HANDLERS,
+        create_static_files_router(
+            path=SCHEMA_ASSETS_PATH, directories=[HERE / "static"]
+        ),
+    ]
     middleware: list[Any] = []
     template_config = csrf = None
     if settings.portal is not None:
