@@ -9,9 +9,8 @@
     <span class="muted">lookup{{ "" if usage.used == 1 and not usage.quota else "s" }}</span>
   </div>
 
-  <section id="lookups" class="flow">
+  <section id="lookups" class="flow" aria-label="Lookups">
     <form class="cluster" method="get" action="/portal#lookups">
-      <h2 class="push">Lookups</h2>
       <label for="from">From</label>
       <input id="from" name="from" type="date" class="field field-sm" value="{{ from or '' }}">
       <label for="to">To</label>
