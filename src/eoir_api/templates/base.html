@@ -76,26 +76,6 @@
         margin: 0;
       }
 
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-
-      th,
-      td {
-        padding: 0.5em 0.6em;
-        white-space: nowrap;
-      }
-
-      th {
-        text-align: left;
-        border-bottom: 1px solid var(--border);
-      }
-
-      td {
-        border-bottom: 1px solid var(--light-grey);
-      }
-
       /* Compositions */
 
       .container {
@@ -132,6 +112,10 @@
         color: var(--muted);
       }
 
+      .small {
+        font-size: 0.9em;
+      }
+
       .err {
         color: var(--text-error);
       }
@@ -144,20 +128,12 @@
         color: var(--text-warning);
       }
 
-      .text-end {
-        text-align: right;
-      }
-
       .justify-end {
         justify-content: flex-end;
       }
 
       .push {
         margin-inline-end: auto;
-      }
-
-      .scroll-x {
-        overflow-x: auto;
       }
 
       /* Blocks */
@@ -170,6 +146,10 @@
       .site-main {
         --flow-space: 1.5rem;
         padding-block: 1.25rem 2.5rem;
+      }
+
+      .site-id {
+        --gutter: 0.4em;
       }
 
       .wordmark {
@@ -238,6 +218,29 @@
         color: var(--text-error);
       }
 
+      .lookups {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .lookup {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        column-gap: 1em;
+        align-items: baseline;
+        padding-block: 0.55em;
+        border-bottom: 1px solid var(--light-grey);
+      }
+
+      .lookup-dur {
+        grid-row: 1 / span 2;
+        grid-column: 2;
+        align-self: center;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
       .stat {
         display: grid;
         grid-template-columns: max-content 1fr;
@@ -256,14 +259,16 @@
   </head>
   <body>
     <nav class="site-nav container cluster repel">
-      <a class="wordmark" href="/portal">EOIR API</a>
+      <div class="cluster site-id">
+        <a class="wordmark" href="/portal">EOIR API</a>
+        {% if tenant %}<span class="muted">/ {{ tenant.name }}</span>{% endif %}
+      </div>
       {% if tenant %}
         <div class="cluster">
           <a href="/schema">API Docs</a>
-          <span class="muted">Signed in as {{ tenant.name }}</span>
           <form method="post" action="/portal/logout">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn-link">Sign out</button>
+            <button type="submit" class="btn-link">End session</button>
           </form>
         </div>
       {% endif %}

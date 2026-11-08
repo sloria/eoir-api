@@ -147,7 +147,7 @@ async def test_portal_lists_redacted_lookups_with_status(client):
     text = (await portal(client)).text
     assert "*****6789" in text
     assert "123456789" not in text
-    assert re.search(r'<td class="ok">\s*OK\s*</td>', text)
+    assert re.search(r'<span class="ok">OK</span>', text)
 
 
 async def test_portal_lookups_are_tenant_scoped(client, usage_service):
@@ -159,29 +159,29 @@ async def test_portal_lookups_are_tenant_scoped(client, usage_service):
 
 
 async def test_portal_paginates_newest_first(client, usage_service):
-    await seed(usage_service, *(dt.timedelta(minutes=m) for m in range(60)))
+    await seed(usage_service, *(dt.timedelta(minutes=m) for m in range(30)))
     await login(client)
     first = (await portal(client)).text
     assert "Jul 25, 12:00" in first
-    assert "Jul 25, 11:11" in first
-    assert "Jul 25, 11:10" not in first
+    assert "Jul 25, 11:41" in first
+    assert "Jul 25, 11:40" not in first
     assert page_link(first, "Previous") is None
-    assert "1\N{EN DASH}50 of 60" in first
+    assert "1\N{EN DASH}20 of 30" in first
     next_url = page_link(first, "Next")
 
     rest = (await client.get(next_url, follow_redirects=False)).text
-    assert "Jul 25, 11:10" in rest
-    assert "Jul 25, 11:11" not in rest
+    assert "Jul 25, 11:40" in rest
+    assert "Jul 25, 11:41" not in rest
     assert page_link(rest, "Next") is None
-    assert "51\N{EN DASH}60 of 60" in rest
+    assert "21\N{EN DASH}30 of 30" in rest
     prev_url = page_link(rest, "Previous")
 
     back = (await client.get(prev_url)).text
     assert "Jul 25, 12:00" in back
-    assert "Jul 25, 11:11" in back
-    assert "Jul 25, 11:10" not in back
+    assert "Jul 25, 11:41" in back
+    assert "Jul 25, 11:40" not in back
     assert page_link(back, "Previous") is None
-    assert "1\N{EN DASH}50 of 60" in back
+    assert "1\N{EN DASH}20 of 30" in back
     assert page_link(back, "Next")
 
 

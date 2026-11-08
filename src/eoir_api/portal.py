@@ -29,7 +29,7 @@ LABELS: dict[LookupOutcome, str] = {
     "captcha": "Captcha failed",
     "upstream_error": "Upstream error",
 }
-PAGE_SIZE = 50
+PAGE_SIZE = 20
 
 
 class Login(msgspec.Struct):

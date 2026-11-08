@@ -18,32 +18,25 @@
       <input id="to" name="to" type="date" class="field field-sm" value="{{ to or '' }}">
       <button type="submit" class="btn">Apply</button>
     </form>
-    <div class="scroll-x">
-      <table>
-        <thead>
-          <tr>
-            <th>A-Number</th>
-            <th>Status</th>
-            <th id="time-heading">Time (UTC)</th>
-            <th class="text-end">Duration</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in items %}
-            <tr>
-              <td>{{ item.a_number_last_4.rjust(9, "*") }}</td>
-              <td class="{{ item.outcome | status_class }}">
-                {{ item.outcome | outcome_label }}{% if item.cached %} <span class="muted">(cached)</span>{% endif %}
-              </td>
-              <td><time datetime="{{ item.ts.isoformat() }}">{{ item.ts.strftime("%b %-d, %H:%M UTC") }}</time></td>
-              <td class="text-end">{{ item.duration_ms | duration }}</td>
-            </tr>
+    <p id="tz-note" class="muted">Times in UTC</p>
+    <ol class="lookups">
+      {% for item in items %}
+        <li class="lookup">
+          <div class="cluster">
+            <span>{{ item.a_number_last_4.rjust(9, "*") }}</span>
+            <span class="{{ item.outcome | status_class }}">{{ item.outcome | outcome_label }}</span>
+          </div>
+          <time class="small muted" datetime="{{ item.ts.isoformat() }}">{{ item.ts.strftime("%a, %b %-d, %H:%M UTC") }}</time>
+          {% if item.cached %}
+            <span class="lookup-dur small muted">cached</span>
           {% else %}
-            <tr><td colspan="4" class="muted">No lookups</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+            <span class="lookup-dur small">{{ item.duration_ms | duration }}</span>
+          {% endif %}
+        </li>
+      {% else %}
+        <li class="muted">No lookups</li>
+      {% endfor %}
+    </ol>
     {% if items %}
       {% set first, last, total = position %}
       <div class="cluster">
@@ -59,15 +52,13 @@
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     document.cookie = `tz=${tz}; path=/portal; max-age=31536000; samesite=lax`;
     const fmt = new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
       month: "short",
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
     });
-    const zoneName = new Intl.DateTimeFormat(undefined, { timeZoneName: "shortGeneric" })
-      .formatToParts()
-      .find((part) => part.type === "timeZoneName").value;
-    document.getElementById("time-heading").textContent = `Time (${zoneName})`;
+    document.getElementById("tz-note").textContent = `Times in ${tz}`;
     for (const el of document.querySelectorAll("time[datetime]")) {
       el.textContent = fmt.format(new Date(el.dateTime));
       el.title = el.dateTime;
