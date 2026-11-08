@@ -171,6 +171,7 @@ def test_load_rejects_names_unsafe_as_directory(write_config, name):
         "tenants = []",
         'tenants = [{ name = "a", key = "" }]',
         'tenants = [{ name = "a", key = "owner-test-secret", quota_per_day = 0 }]',
+        'tenants = [{ name = "a", key = "owner-test-secret", max_concurrency = 0 }]',
         'tenants = [{ name = "a/b", key = "owner-test-secret" }]',
         TENANT + "\n[lookup]\nattempts = 0",
         TENANT + "\n[lookup]\nmax_browsers = 0",

@@ -11,6 +11,8 @@ from acis_browser import (
     UpstreamError,
 )
 
+from .conftest import BODY, METERED, lookup_rows
+
 pytestmark = pytest.mark.anyio
 
 A_NUMBER = "999999999"
@@ -255,3 +257,38 @@ async def test_failures_are_never_served_from_cache(client, browser):
     )
     assert failed.status_code == 503
     assert "acis" not in failed.json()
+
+
+##### Admission #####
+
+
+async def test_tenant_at_max_concurrency_gets_429_while_another_tenant_is_admitted(
+    client, service, settings
+):
+    settings.tenants[1].max_concurrency = 1
+    service._tenant_pending["metered"] = 1  # one lookup in flight
+
+    with structlog.testing.capture_logs() as logs:
+        rejected = await lookup(client, BODY, headers=METERED)
+    admitted = await lookup(client, BODY, headers=HEADERS)
+
+    assert rejected.status_code == 429
+    assert rejected.headers["Retry-After"] == "10"
+    assert admitted.status_code == 200
+    [event] = [e for e in logs if e["event"].startswith("case.")]
+    assert event["event"] == "case.tenant_capped"
+    assert event["max_concurrency"] == 1
+
+
+async def test_max_concurrency_hit_does_not_record_a_lookup_or_consume_quota(
+    client, browser, service, settings, usage_service
+):
+    settings.tenants[1].max_concurrency = 1
+    service._tenant_pending["metered"] = 1
+
+    rejected = await lookup(client, BODY, headers=METERED)
+
+    assert rejected.status_code == 429
+    assert rejected.headers["X-RateLimit-Remaining"] == "5"
+    assert browser.calls == []
+    assert await lookup_rows(usage_service) == []

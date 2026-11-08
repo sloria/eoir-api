@@ -108,6 +108,8 @@ class Tenant(_Base):
     """Value the tenant sends in the ``x-api-key`` header."""
     quota_per_day: Annotated[int, msgspec.Meta(ge=1)] | None = None
     """Lookups allowed per rolling 24h. Unset means unlimited."""
+    max_concurrency: Annotated[int, msgspec.Meta(ge=1)] | None = None
+    """Concurrent lookups allowed before 429. Unset means no cap."""
 
     def __post_init__(self) -> None:
         if len(self.key) < MIN_KEY_LENGTH:

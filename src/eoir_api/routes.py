@@ -157,7 +157,10 @@ async def fetch_case(
             extra={"reason": "quota_exceeded"},
         ) from exc
     except QueueTimeoutError as exc:
-        log.info("case.queue_full", error=str(exc))
+        if exc.max_concurrency is not None:
+            log.info("case.tenant_capped", max_concurrency=exc.max_concurrency)
+        else:
+            log.info("case.queue_full", error=str(exc))
         raise TooManyRequestsException(
             "Too many pending lookups. Retry later.",
             headers=retry_after_header(service.avg_lookup_seconds),
