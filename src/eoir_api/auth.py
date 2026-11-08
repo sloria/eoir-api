@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 SESSION_MAX_AGE = 12 * 60 * 60  # seconds
 
+logger = structlog.get_logger()
+
 
 def resolve_tenant(tenants: Iterable[Tenant], key: str) -> Tenant | None:
     given = key.encode()
@@ -54,6 +56,9 @@ class TenantAuthMiddleware(ASGIMiddleware):
                 tenant = self.by_name.get(session.get("tenant"))
             auth = "cookie"
         if tenant is None:
+            logger.warning(
+                "auth.rejected", path=scope["path"], method=scope["method"], auth=auth
+            )
             raise NotAuthorizedException("Invalid or missing x-api-key header")
         scope["user"] = tenant
         scope["auth"] = auth
