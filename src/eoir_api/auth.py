@@ -57,7 +57,10 @@ class TenantAuthMiddleware(ASGIMiddleware):
             auth = "cookie"
         if tenant is None:
             logger.warning(
-                "auth.rejected", path=scope["path"], method=scope["method"], auth=auth
+                "auth.rejected",
+                path=scope["path"],
+                method=scope.get("method"),
+                auth=auth,
             )
             raise NotAuthorizedException("Invalid or missing x-api-key header")
         scope["user"] = tenant
