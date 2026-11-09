@@ -238,7 +238,7 @@ class CaseService:
         if not refresh:
             entry = self._cache.get(key)
             if entry is not None:
-                logger.debug("lookup.cache_hit", nat_code=nationality.code)
+                logger.debug("lookup.cache_hit")
                 await usage.record(outcome="ok", cached=True)
                 return Case(
                     a_number=a_number,
@@ -273,14 +273,13 @@ class CaseService:
         self._tenant_pending[tenant.name] += 1
         started = self.clock()
         outcome: LookupOutcome = "ok"
-        logger.info("lookup.start", nat_code=nationality.code, pending=self._pending)
+        logger.info("lookup.start", pending=self._pending)
         try:
             payload, slot, duration = await self._lookup(a_number, nationality)
             upstream = Outcome.from_payload(payload)
             if upstream is not Outcome.OK:
                 logger.info(
                     "lookup.no_case",
-                    nat_code=nationality.code,
                     browser=slot.name,
                     group=slot.group,
                     outcome=upstream,
@@ -290,7 +289,6 @@ class CaseService:
             outcome = outcome_of(exc)
             logger.warning(
                 "lookup.failed",
-                nat_code=nationality.code,
                 error=type(exc).__name__,
                 outcome=outcome,
                 elapsed=round(self.clock() - started, 1),
@@ -308,7 +306,6 @@ class CaseService:
         entry = self._cache.set(key, payload)
         logger.info(
             "lookup.success",
-            nat_code=nationality.code,
             browser=slot.name,
             group=slot.group,
             duration=round(duration, 1),

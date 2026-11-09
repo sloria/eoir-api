@@ -145,21 +145,20 @@ async def fetch_case(
     except UnknownNationalityError as exc:
         raise ClientException(str(exc)) from exc
 
-    log = logger.bind(nat_code=resolved.code)
     try:
         return await service.get_case(
             cleaned, resolved, usage=usage, refresh=data.refresh
         )
     except CaseNotFoundError as exc:
-        log.info("case.not_found")
+        logger.info("case.not_found")
         raise NotFoundException("No case found for that A-Number.") from exc
     except InvalidNationalityError as exc:
-        log.info("case.invalid_nationality")
+        logger.info("case.invalid_nationality")
         raise NotFoundException(
             "No case found for that A-Number with that nationality code."
         ) from exc
     except CaseUnavailableError as exc:
-        log.info("case.unavailable")
+        logger.info("case.unavailable")
         raise UnprocessableContentException(str(exc)) from exc
     except QuotaExceededError as exc:
         raise TooManyRequestsException(
@@ -169,30 +168,30 @@ async def fetch_case(
         ) from exc
     except QueueTimeoutError as exc:
         if exc.max_concurrency is not None:
-            log.info("case.tenant_capped", max_concurrency=exc.max_concurrency)
+            logger.info("case.tenant_capped", max_concurrency=exc.max_concurrency)
         else:
-            log.info("case.queue_full", error=str(exc))
+            logger.info("case.queue_full", error=str(exc))
         raise TooManyRequestsException(
             "Too many pending lookups. Retry later.",
             headers=retry_after_header(service.avg_lookup_seconds),
         ) from exc
     except CaptchaError as exc:
-        log.warning("case.captcha_error", reason=exc.reason)
+        logger.warning("case.captcha_error", reason=exc.reason)
         raise ServiceUnavailableException(
             UNAVAILABLE_DETAIL, headers=retry_after_header(service.retry_after)
         ) from exc
     except BrowserUnavailableError as exc:
-        log.info("case.browsers_unavailable", retry_after=round(exc.retry_after))
+        logger.info("case.browsers_unavailable", retry_after=round(exc.retry_after))
         raise ServiceUnavailableException(
             UNAVAILABLE_DETAIL, headers=retry_after_header(exc.retry_after)
         ) from exc
     except BrowserLostError as exc:
-        log.warning("case.browser_lost", error=str(exc))
+        logger.warning("case.browser_lost", error=str(exc))
         raise ServiceUnavailableException(
             UNAVAILABLE_DETAIL, headers=retry_after_header(1)
         ) from exc
     except UpstreamError as exc:
-        log.warning("case.upstream_error", error=str(exc))
+        logger.warning("case.upstream_error", error=str(exc))
         raise BadGatewayException("EOIR lookup failed.") from exc
 
 
