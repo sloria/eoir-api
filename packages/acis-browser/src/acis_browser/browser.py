@@ -176,7 +176,6 @@ class AcisBrowser:
                             "lookup.captcha_failed",
                             attempt=attempt,
                             attempts=attempts,
-                            nat_code=nat_code,
                             reason=exc.reason,
                             error=str(exc),
                         )
