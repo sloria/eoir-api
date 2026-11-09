@@ -23,6 +23,18 @@ async def lookup(client, body, headers=HEADERS):
     return await client.post("/cases/lookup", json=body, headers=headers)
 
 
+##### Index #####
+
+
+async def test_index_links_resolve_without_auth(client):
+    response = await client.get("/")
+    assert response.status_code == 200
+    links = response.json()
+    assert set(links) == {"docs", "openapi"}
+    for path in links.values():
+        assert (await client.get(path)).status_code == 200
+
+
 ##### Health #####
 
 

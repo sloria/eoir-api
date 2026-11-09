@@ -86,7 +86,18 @@ def rate_limit_headers(quota: Quota | None) -> dict[str, str]:
     }
 
 
-@get("/healthz", media_type="text/plain", include_in_schema=False, sync_to_thread=False)
+@get("/", exclude_from_auth=True, include_in_schema=False, sync_to_thread=False)
+def index() -> dict[str, str]:
+    return {"docs": "/schema", "openapi": "/schema/openapi.json"}
+
+
+@get(
+    "/healthz",
+    media_type="text/plain",
+    exclude_from_auth=True,
+    include_in_schema=False,
+    sync_to_thread=False,
+)
 def health() -> Response:
     return Response("ok", status_code=200)
 
@@ -185,4 +196,4 @@ async def fetch_case(
         raise BadGatewayException("EOIR lookup failed.") from exc
 
 
-ROUTE_HANDLERS = [health, lookup_case]
+ROUTE_HANDLERS = [index, health, lookup_case]
