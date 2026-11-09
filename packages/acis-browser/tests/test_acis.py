@@ -140,7 +140,6 @@ def test_raise_for_outcome_is_a_no_op_for_a_success(master_hearing):
         ("No case info found for A-Number", CaseNotFoundError),
         ("Invalid nationality code", InvalidNationalityError),
         ("Case information is unavailable", CaseUnavailableError),
-        ("Something else broke", UpstreamError),
     ],
 )
 def test_raise_for_outcome_raises_the_matching_error(message, expected):
@@ -150,6 +149,15 @@ def test_raise_for_outcome_raises_the_matching_error(message, expected):
         raise_for_outcome(payload)
     assert excinfo.value.payload == payload
     assert str(excinfo.value) == message
+
+
+def test_raise_for_outcome_omits_unrecognized_upstream_text():
+    payload = {"message": "Lookup broke for 123456789"}
+
+    with pytest.raises(UpstreamError) as excinfo:
+        raise_for_outcome(payload)
+    assert excinfo.value.payload == payload
+    assert "123456789" not in str(excinfo.value)
 
 
 def test_raise_for_outcome_reports_a_rejected_captcha():

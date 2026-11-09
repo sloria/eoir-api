@@ -141,11 +141,10 @@ async def test_portal_shows_count_for_unlimited_tenant(client, usage_service):
     assert "<strong>1</strong>" in text
 
 
-async def test_portal_lists_redacted_lookups_with_status(client):
+async def test_portal_lists_lookups_with_status(client):
     await lookup(client, body={"a_number": "123-456-789", "nationality": "VE"})
     await login(client)
     text = (await portal(client)).text
-    assert "*****6789" in text
     assert "123456789" not in text
     assert re.search(r'<span class="ok">OK</span>', text)
 

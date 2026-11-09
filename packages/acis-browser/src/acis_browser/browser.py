@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Self
 
 import structlog
-from acis_core.a_numbers import redact
 from acis_core.outcome import Outcome
 from patchright._impl._errors import TargetClosedError  # not re-exported publicly
 from patchright.async_api import Error as PlaywrightError
@@ -69,9 +68,7 @@ def raise_for_outcome(payload: dict[str, Any]) -> None:
         raise InvalidNationalityError(message, payload=payload)
     if outcome is Outcome.UNAVAILABLE:
         raise CaseUnavailableError(message, payload=payload)
-    raise UpstreamError(
-        message or "ACIS returned an unexpected payload", payload=payload
-    )
+    raise UpstreamError("ACIS returned an unexpected payload", payload=payload)
 
 
 ##### Browser #####
@@ -179,7 +176,6 @@ class AcisBrowser:
                             "lookup.captcha_failed",
                             attempt=attempt,
                             attempts=attempts,
-                            a_number=redact(a_number),
                             nat_code=nat_code,
                             reason=exc.reason,
                             error=str(exc),

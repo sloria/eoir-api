@@ -13,7 +13,7 @@ from acis_browser import (
     InvalidNationalityError,
     UpstreamError,
 )
-from acis_core.a_numbers import InvalidANumberError, normalize_a_number, redact
+from acis_core.a_numbers import InvalidANumberError, normalize_a_number
 from acis_core.nationalities import UnknownNationalityError, resolve
 from litestar import Response, get, post
 from litestar.di import NamedDependency
@@ -134,7 +134,7 @@ async def fetch_case(
     except UnknownNationalityError as exc:
         raise ClientException(str(exc)) from exc
 
-    log = logger.bind(a_number=redact(cleaned), nat_code=resolved.code)
+    log = logger.bind(nat_code=resolved.code)
     try:
         return await service.get_case(
             cleaned, resolved, usage=usage, refresh=data.refresh

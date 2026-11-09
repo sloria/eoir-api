@@ -239,7 +239,7 @@ class CaseService:
             entry = self._cache.get(key)
             if entry is not None:
                 logger.debug("lookup.cache_hit", nat_code=nationality.code)
-                await usage.record(a_number=a_number, outcome="ok", cached=True)
+                await usage.record(outcome="ok", cached=True)
                 return Case(
                     a_number=a_number,
                     nationality=nationality,
@@ -300,7 +300,6 @@ class CaseService:
             self._pending -= 1
             self._tenant_pending[tenant.name] -= 1
             await usage.record(
-                a_number=a_number,
                 outcome=outcome,
                 cached=False,
                 duration_ms=round((self.clock() - started) * 1000),

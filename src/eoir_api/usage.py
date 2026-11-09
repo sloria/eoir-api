@@ -33,7 +33,6 @@ queries.load_sql(Path(__file__).parent / "sql" / "usage.sql")
 
 class LookupItem(msgspec.Struct):
     ts: dt.datetime
-    a_number_last_4: str
     outcome: LookupOutcome
     cached: bool
     duration_ms: int | None
@@ -91,7 +90,6 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
         *,
         tenant: str,
         ts: dt.datetime,
-        a_number: str,
         outcome: LookupOutcome,
         cached: bool,
         duration_ms: int | None = None,
@@ -101,7 +99,6 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
                 queries.get_sql("record_lookup"),
                 tenant,
                 iso(ts),
-                a_number[-4:],
                 outcome,
                 int(cached),
                 duration_ms,
@@ -191,7 +188,6 @@ class TenantUsage:
     async def record(
         self,
         *,
-        a_number: str,
         outcome: LookupOutcome,
         cached: bool,
         duration_ms: int | None = None,
@@ -199,7 +195,6 @@ class TenantUsage:
         await self.service.record(
             tenant=self.tenant.name,
             ts=dt.datetime.now(dt.UTC),
-            a_number=a_number,
             outcome=outcome,
             cached=cached,
             duration_ms=duration_ms,
