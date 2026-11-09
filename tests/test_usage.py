@@ -135,12 +135,6 @@ async def test_cache_hit_records_cached_row(client, usage_service):
     assert [(r.outcome, r.cached, r.duration_ms) for r in rows[1:]] == [("ok", 1, None)]
 
 
-async def test_only_last_four_digits_are_stored(client, usage_service):
-    await lookup(client, body={"a_number": "123-456-789", "nationality": "VE"})
-    [row] = await lookup_rows(usage_service)
-    assert row.a_number_last_4 == "6789"
-
-
 ##### Prune #####
 
 

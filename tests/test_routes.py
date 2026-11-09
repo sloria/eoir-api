@@ -32,6 +32,21 @@ async def test_health_check(client):
     assert response.text == "ok"
 
 
+##### Request IDs #####
+
+
+async def test_each_response_has_its_own_request_id(client):
+    first = await lookup(client, BODY)
+    second = await lookup(client, BODY)
+    assert first.headers["x-request-id"] != second.headers["x-request-id"]
+
+
+async def test_error_response_has_a_request_id(client):
+    response = await lookup(client, {"a_number": "12345", "nationality": "VE"})
+    assert response.status_code == 400
+    assert response.headers["x-request-id"]
+
+
 ##### Auth #####
 
 
