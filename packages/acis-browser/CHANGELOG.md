@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.7.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.6.0...acis-browser-v3.7.0) (2026-11-09)
+
+
+### Features
+
+* remove nat code from logs ([#86](https://github.com/sloria/eoir-api/issues/86)) ([19ec252](https://github.com/sloria/eoir-api/commit/19ec2520b85e2047ac868c3dddffe490cd31b06b))
+
 ## [3.6.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.5.0...acis-browser-v3.6.0) (2026-11-09)
 
 
