@@ -293,7 +293,7 @@ def build_app(
     middleware: list[Any] = []
     template_config = csrf = None
     if settings.portal is not None:
-        api_paths = ["^/cases", "^/healthz", "^/schema"]
+        api_paths = ["^/$", "^/cases", "^/healthz", "^/schema"]
         session = CookieBackendConfig(
             secret=settings.portal.session_key,
             key="session",

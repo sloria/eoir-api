@@ -35,7 +35,7 @@ class TenantAuthMiddleware(ASGIMiddleware):
 
     exclude_opt_key = "exclude_from_auth"
     should_bypass_for_scope = staticmethod(
-        lambda scope: scope["path"].startswith(("/healthz", "/schema"))
+        lambda scope: scope["path"].startswith("/schema")
     )
 
     def __init__(self, tenants: Iterable[Tenant]) -> None:
