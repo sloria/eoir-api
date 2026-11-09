@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.6.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.5.0...acis-browser-v3.6.0) (2026-11-09)
+
+
+### Features
+
+* don't store A-numbers (even redacted); send x-request-id ([#83](https://github.com/sloria/eoir-api/issues/83)) ([e19e88d](https://github.com/sloria/eoir-api/commit/e19e88dc2ce0069d4dd6182335e279f2cabc46d1))
+
 ## [3.5.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.4.0...acis-browser-v3.5.0) (2026-11-07)
 
 
