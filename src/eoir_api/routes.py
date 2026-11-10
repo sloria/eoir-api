@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal, cast
 
 import msgspec
 import structlog
@@ -15,7 +15,7 @@ from acis_browser import (
 )
 from acis_core.a_numbers import InvalidANumberError, normalize_a_number
 from acis_core.nationalities import UnknownNationalityError, resolve
-from litestar import Response, get, post
+from litestar import Request, Response, get, post
 from litestar.di import NamedDependency
 from litestar.exceptions import (
     ClientException,
@@ -67,28 +67,22 @@ class CaseLookup(msgspec.Struct, forbid_unknown_fields=True):
     ] = False
 
 
-class Problem(msgspec.Struct):
-    status: int
-    title: str
+class TooManyRequests(msgspec.Struct):
+    status_code: int
     detail: str
-    extra: list[dict[str, Any]] | None = None
-
-
-class TooManyRequestsProblem(Problem):
     code: Annotated[
-        str | None,
-        msgspec.Meta(description="`quota_exceeded` when the daily quota is used up."),
+        Literal["quota_exceeded"] | None,
+        msgspec.Meta(description="Set when the daily quota is used up."),
     ] = None
 
 
-def problem_response(
-    description: str, container: type[Problem] = Problem
-) -> ResponseSpec:
-    return ResponseSpec(
-        data_container=container,
-        description=description,
-        generate_examples=False,
-        media_type="application/problem+json",
+def flatten_extra(_: Request, exc: TooManyRequestsException) -> Response:
+    """Build an error response with `extra` moved to the top level."""
+    extra = cast("dict[str, Any]", exc.extra or {})
+    return Response(
+        {"status_code": exc.status_code, "detail": exc.detail, **extra},
+        status_code=exc.status_code,
+        headers=exc.headers,
     )
 
 
@@ -131,17 +125,20 @@ def health() -> Response:
 @post(
     "/cases/lookup",
     status_code=HTTP_200_OK,
+    raises=[
+        NotFoundException,
+        UnprocessableContentException,
+        BadGatewayException,
+        ServiceUnavailableException,
+    ],
     responses={
-        400: problem_response("Invalid A-Number, nationality or request body"),
-        404: problem_response("No case found"),
-        422: problem_response("Case unavailable"),
-        429: problem_response(
-            "Too many pending lookups, or daily quota exceeded",
-            TooManyRequestsProblem,
+        429: ResponseSpec(
+            TooManyRequests,
+            description="Too many pending lookups or daily quota exceeded",
+            generate_examples=False,
         ),
-        502: problem_response("EOIR lookup failed"),
-        503: problem_response("Lookups temporarily unavailable"),
     },
+    exception_handlers={TooManyRequestsException: flatten_extra},
 )
 async def lookup_case(
     *,

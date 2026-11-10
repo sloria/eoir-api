@@ -56,7 +56,6 @@ async def test_login_without_csrf_token_is_403(client):
         "/portal/login", data={"key": "metered-test-secret"}, follow_redirects=False
     )
     assert response.status_code == 403
-    assert "problem" not in response.headers["content-type"]
     assert (await portal(client)).status_code == 302
 
 

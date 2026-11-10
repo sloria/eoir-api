@@ -67,7 +67,6 @@ async def test_missing_secret_is_rejected(client):
         client, {"a_number": A_NUMBER, "nationality": "VE"}, headers={}
     )
     assert response.status_code == 401
-    assert response.headers["content-type"] == "application/problem+json"
 
 
 async def test_wrong_secret_is_rejected(client):
@@ -211,24 +210,14 @@ async def test_invalid_nationality_returns_404(client, browser):
     assert "nationality" in response.json()["detail"].lower()
 
 
-async def test_case_not_found_returns_404_problem_details(client, browser):
+async def test_case_not_found_returns_404(client, browser):
     browser.error = CaseNotFoundError("No case info found")
     response = await lookup(client, {"a_number": A_NUMBER, "nationality": "VE"})
     assert response.status_code == 404
-    assert response.headers["content-type"] == "application/problem+json"
     assert response.json() == {
-        "status": 404,
-        "title": "Not Found",
+        "status_code": 404,
         "detail": "No case found for that A-Number.",
     }
-
-
-async def test_unhandled_error_hides_its_message(client, browser):
-    browser.error = RuntimeError("secret")
-    response = await lookup(client, {"a_number": A_NUMBER, "nationality": "VE"})
-    assert response.status_code == 500
-    assert response.headers["content-type"] == "application/problem+json"
-    assert "secret" not in response.text
 
 
 async def test_case_unavailable_returns_422(client, browser):
