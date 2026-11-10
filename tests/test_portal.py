@@ -131,14 +131,16 @@ async def test_portal_shows_usage_against_quota(client, usage_service):
     await seed(usage_service, dt.timedelta(days=2))
     await login(client)
     text = (await portal(client)).text
-    assert "<strong>2 / 5</strong>" in text
+    assert "of 5 lookups" in text
+    assert "3 left" in text
 
 
 async def test_portal_shows_count_for_unlimited_tenant(client, usage_service):
     await seed(usage_service, dt.timedelta(hours=1), tenant="owner")
     await login(client, key="owner-test-secret")
     text = (await portal(client)).text
-    assert "<strong>1</strong>" in text
+    assert "1</strong>" in text
+    assert "left" not in text
 
 
 async def test_portal_lists_lookups_with_status(client):
@@ -146,7 +148,7 @@ async def test_portal_lists_lookups_with_status(client):
     await login(client)
     text = (await portal(client)).text
     assert "123456789" not in text
-    assert re.search(r'<span class="ok">OK</span>', text)
+    assert ">OK<" in text
 
 
 async def test_portal_lookups_are_tenant_scoped(client, usage_service):
@@ -158,29 +160,29 @@ async def test_portal_lookups_are_tenant_scoped(client, usage_service):
 
 
 async def test_portal_paginates_newest_first(client, usage_service):
-    await seed(usage_service, *(dt.timedelta(minutes=m) for m in range(30)))
+    await seed(usage_service, *(dt.timedelta(minutes=m) for m in range(15)))
     await login(client)
     first = (await portal(client)).text
     assert "Jul 25, 12:00" in first
-    assert "Jul 25, 11:41" in first
-    assert "Jul 25, 11:40" not in first
+    assert "Jul 25, 11:51" in first
+    assert "Jul 25, 11:50" not in first
     assert page_link(first, "Previous") is None
-    assert "1\N{EN DASH}20 of 30" in first
+    assert "1\N{EN DASH}10 of 15" in first
     next_url = page_link(first, "Next")
 
     rest = (await client.get(next_url, follow_redirects=False)).text
-    assert "Jul 25, 11:40" in rest
-    assert "Jul 25, 11:41" not in rest
+    assert "Jul 25, 11:50" in rest
+    assert "Jul 25, 11:51" not in rest
     assert page_link(rest, "Next") is None
-    assert "21\N{EN DASH}30 of 30" in rest
+    assert "11\N{EN DASH}15 of 15" in rest
     prev_url = page_link(rest, "Previous")
 
     back = (await client.get(prev_url)).text
     assert "Jul 25, 12:00" in back
-    assert "Jul 25, 11:41" in back
-    assert "Jul 25, 11:40" not in back
+    assert "Jul 25, 11:51" in back
+    assert "Jul 25, 11:50" not in back
     assert page_link(back, "Previous") is None
-    assert "1\N{EN DASH}20 of 30" in back
+    assert "1\N{EN DASH}10 of 15" in back
     assert page_link(back, "Next")
 
 

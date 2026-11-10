@@ -2,29 +2,56 @@
 {% macro pager_link(label, url) %}
   {% if url %}<a href="{{ url }}">{{ label }}</a>{% else %}<span class="muted" aria-disabled="true">{{ label }}</span>{% endif %}
 {% endmacro %}
+{% macro timestamp(ts, class=None) %}
+  <time{% if class %} class="{{ class }}"{% endif %} datetime="{{ ts.isoformat() }}">{{ ts.strftime("%a, %b %-d, %H:%M UTC") }}</time>
+{%- endmacro %}
 {% block main %}
-  <div class="stat">
-    <span class="muted">Past 24 hours</span>
-    <strong>{{ "{:,}".format(usage.used) }}{% if usage.quota %} / {{ "{:,}".format(usage.quota.limit) }}{% endif %}</strong>
-    <span class="muted">lookup{{ "" if usage.used == 1 and not usage.quota else "s" }}</span>
-  </div>
+  {% set quota = usage.quota %}
+  <section class="stack" aria-label="Quota">
+    {% if quota %}<span class="muted">Quota</span>{% endif %}
+    <p>
+      <strong class="figure">{{ usage.used | number }}</strong>
+      <span class="muted">
+        {%- if quota %}of {{ quota.limit | number }} lookups used
+        {%- else %}lookup{{ "" if usage.used == 1 else "s" }}{% endif %} in the past 24 hours</span>
+    </p>
+    {% if quota %}
+      <div class="meter" role="meter" aria-label="Quota used" aria-valuemin="0" aria-valuemax="{{ quota.limit }}" aria-valuenow="{{ usage.used }}">
+        <span style="width: {{ [usage.used / quota.limit * 100, 100] | min | round(1) }}%"></span>
+      </div>
+      <p class="small muted">
+        {{ quota.remaining | number }} left
+        {%- if usage.used %}. Next lookup frees up {{ timestamp(quota.reset_at) }}{% endif %}
+      </p>
+    {% endif %}
+  </section>
 
   <section id="lookups" class="flow" aria-label="Lookups">
-    <form class="cluster" method="get" action="/portal#lookups">
+    <form class="cluster" method="get" action="/portal">
       <label for="from">From</label>
       <input id="from" name="from" type="date" class="field field-sm" value="{{ from or '' }}">
       <label for="to">To</label>
       <input id="to" name="to" type="date" class="field field-sm" value="{{ to or '' }}">
-      <button type="submit" class="btn">Apply</button>
+      <button type="submit" class="btn btn-sm stretch">Apply</button>
     </form>
-    <p id="tz-note" class="muted">Times in UTC</p>
+    <div class="cluster">
+      <p id="tz-note" class="muted push">Times in UTC</p>
+      {% if items %}
+        {% set first, last, total = position %}
+        <span class="muted">{{ "{:,}–{:,} of {:,}".format(first, last, total) }}</span>
+        {% if prev_after or next_before %}
+          {{ pager_link("Previous", prev_after and page_url(after=prev_after.isoformat())) }}
+          {{ pager_link("Next", next_before and page_url(before=next_before.isoformat())) }}
+        {% endif %}
+      {% endif %}
+    </div>
     <ol class="lookups">
       {% for item in items %}
         <li class="lookup">
-          <span class="{{ item.outcome | status_class }}">{{ item.outcome | outcome_label }}</span>
-          <time class="small muted" datetime="{{ item.ts.isoformat() }}">{{ item.ts.strftime("%a, %b %-d, %H:%M UTC") }}</time>
+          <span{% if item.outcome is failed %} class="err"{% endif %}>{{ item.outcome | outcome_label }}</span>
+          {{ timestamp(item.ts, "small muted") }}
           {% if item.cached %}
-            <span class="lookup-dur small muted">cached</span>
+            <span class="lookup-dur small muted">from cache</span>
           {% else %}
             <span class="lookup-dur small">{{ item.duration_ms | duration }}</span>
           {% endif %}
@@ -33,16 +60,6 @@
         <li class="muted">No lookups</li>
       {% endfor %}
     </ol>
-    {% if items %}
-      {% set first, last, total = position %}
-      <div class="cluster">
-        <span class="muted push">{{ "{:,}–{:,} of {:,}".format(first, last, total) }}</span>
-        {% if prev_after or next_before %}
-          {{ pager_link("Previous", prev_after and page_url(after=prev_after.isoformat())) }}
-          {{ pager_link("Next", next_before and page_url(before=next_before.isoformat())) }}
-        {% endif %}
-      </div>
-    {% endif %}
   </section>
   <script>
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -58,6 +75,19 @@
     for (const el of document.querySelectorAll("time[datetime]")) {
       el.textContent = fmt.format(new Date(el.dateTime));
       el.title = el.dateTime;
+    }
+
+    // Keep the scroll position across paging and filtering.
+    const lookups = document.getElementById("lookups");
+    const saveScroll = () => sessionStorage.setItem("scroll", window.scrollY);
+    lookups.addEventListener("submit", saveScroll);
+    lookups.addEventListener("click", (event) => {
+      if (event.target.closest("a")) saveScroll();
+    });
+    const scroll = sessionStorage.getItem("scroll");
+    if (scroll !== null) {
+      sessionStorage.removeItem("scroll");
+      window.scrollTo(0, Number(scroll));
     }
   </script>
 {% endblock %}

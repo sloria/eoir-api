@@ -18,8 +18,6 @@
         --light-blue: #4d8aff;
         --bg-error: #f8d7da;
         --text-error: #721c24;
-        --text-success: #155724;
-        --text-warning: #856404;
       }
 
       @media (prefers-color-scheme: dark) {
@@ -32,8 +30,6 @@
           --blue: #4d8aff;
           --bg-error: #2d1b1e;
           --text-error: #f5c6cb;
-          --text-success: #c3e6cb;
-          --text-warning: #ffeaa7;
         }
       }
 
@@ -120,16 +116,12 @@
         color: var(--text-error);
       }
 
-      .ok {
-        color: var(--text-success);
-      }
-
-      .warn {
-        color: var(--text-warning);
-      }
-
       .justify-end {
         justify-content: flex-end;
+      }
+
+      .stretch {
+        align-self: stretch;
       }
 
       .push {
@@ -177,6 +169,10 @@
         &:hover {
           text-decoration: underline;
         }
+      }
+
+      .btn-sm {
+        padding-block: 0.3em;
       }
 
       .btn-primary {
@@ -241,18 +237,19 @@
         font-variant-numeric: tabular-nums;
       }
 
-      .stat {
-        display: grid;
-        grid-template-columns: max-content 1fr;
-        align-items: baseline;
-        column-gap: 0.4em;
+      .figure {
+        font-size: 1.5em;
+      }
 
-        & > :first-child {
-          grid-column: 1 / -1;
-        }
+      .meter {
+        height: 0.9em;
+        border: 1px solid var(--border);
+        background: var(--light-grey);
 
-        & strong {
-          font-size: 1.5em;
+        & span {
+          display: block;
+          height: 100%;
+          background: var(--text);
         }
       }
     </style>
