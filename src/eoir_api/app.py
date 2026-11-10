@@ -5,6 +5,7 @@ import logging
 import sys
 import time
 from contextlib import asynccontextmanager
+from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -17,6 +18,7 @@ from litestar import Litestar, Request
 from litestar.config.csrf import CSRFConfig
 from litestar.datastructures import State
 from litestar.di import Provide
+from litestar.exceptions import HTTPException, InternalServerException
 from litestar.logging.config import (
     LoggingConfig,
     StructLoggingConfig,
@@ -30,8 +32,14 @@ from litestar.openapi import OpenAPIConfig
 from litestar.openapi.plugins import ScalarRenderPlugin
 from litestar.openapi.spec import Components, SecurityScheme
 from litestar.plugins.jinja import JinjaTemplateEngine
+from litestar.plugins.problem_details import (
+    ProblemDetailsConfig,
+    ProblemDetailsException,
+    ProblemDetailsPlugin,
+)
 from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 from litestar.static_files import create_static_files_router
+from litestar.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
 from litestar.template import TemplateConfig
 from sentry_sdk.integrations.litestar import LitestarIntegration
 from sqlspec import SQLSpec
@@ -130,7 +138,7 @@ def make_usage_lifespan(
 
 
 API_DESCRIPTION = """\
-Look up immigration court case information from EOIR's [Automated Case Information System (ACIS)](https://acis.eoir.justice.gov/).
+Look up case information from EOIR's [Automated Case Information System (ACIS)](https://acis.eoir.justice.gov/).
 
 Authenticate by sending your API key in the `x-api-key` header.
 
@@ -140,7 +148,11 @@ Lookups run against a slow upstream with limited capacity. `429` and `503` respo
 
 **Always honor `Retry-After`.** Wait at least that long before sending the request again.
 
-A `429` usually means too many lookups are pending, and the wait is typically seconds. If `extra.reason` is `quota_exceeded`, your daily quota is used up, and the wait can be hours. A `503` means lookups are temporarily unavailable, and the wait can be seconds to minutes.
+A `429` usually means too many lookups are pending, and the wait is typically seconds. If `code` is `quota_exceeded`, your daily quota is used up, and the wait can be hours. A `503` means lookups are temporarily unavailable, and the wait can be seconds to minutes.
+
+## Errors
+
+Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details, sent as `application/problem+json`.
 
 ## Quota
 
@@ -180,6 +192,23 @@ def create_openapi_config() -> OpenAPIConfig:
             }
         ),
         security=[{"apiKey": []}],
+    )
+
+
+def to_problem_details(exc: Exception) -> ProblemDetailsException:
+    """Convert an exception to a problem response, hiding the message of any 500."""
+    http = (
+        exc
+        if isinstance(exc, HTTPException)
+        and exc.status_code != HTTP_500_INTERNAL_SERVER_ERROR
+        else InternalServerException()
+    )
+    return ProblemDetailsException(
+        status_code=http.status_code,
+        title=HTTPStatus(http.status_code).phrase,
+        detail=http.detail,
+        headers=http.headers,
+        extra=http.extra,
     )
 
 
@@ -335,7 +364,15 @@ def build_app(
             TenantAuthMiddleware(settings.tenants),
         ],
         csrf_config=csrf,
-        plugins=[SQLSpecPlugin(sqlspec=spec), *plugins],
+        plugins=[
+            SQLSpecPlugin(sqlspec=spec),
+            ProblemDetailsPlugin(
+                ProblemDetailsConfig(
+                    exception_to_problem_detail_map={Exception: to_problem_details}
+                )
+            ),
+            *plugins,
+        ],
         lifespan=[
             make_usage_lifespan(usage_service, usage_config),
             *lifespan,

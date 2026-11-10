@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Annotated
+from typing import Annotated, Any
 
 import msgspec
 import structlog
@@ -24,6 +24,7 @@ from litestar.exceptions import (
     ServiceUnavailableException,
     TooManyRequestsException,
 )
+from litestar.openapi import ResponseSpec
 from litestar.params import JSONBody
 from litestar.status_codes import (
     HTTP_200_OK,
@@ -66,6 +67,26 @@ class CaseLookup(msgspec.Struct, forbid_unknown_fields=True):
     ] = False
 
 
+class Problem(msgspec.Struct):
+    status: int
+    title: str
+    detail: str
+    code: Annotated[
+        str | None,
+        msgspec.Meta(description="`quota_exceeded` when the daily quota is used up."),
+    ] = None
+    extra: list[dict[str, Any]] | None = None
+
+
+def problem_response(description: str) -> ResponseSpec:
+    return ResponseSpec(
+        data_container=Problem,
+        description=description,
+        generate_examples=False,
+        media_type="application/problem+json",
+    )
+
+
 ##### Route handlers #####
 
 
@@ -105,14 +126,14 @@ def health() -> Response:
 @post(
     "/cases/lookup",
     status_code=HTTP_200_OK,
-    raises=[
-        NotFoundException,
-        UnprocessableContentException,
-        TooManyRequestsException,
-        BadGatewayException,
-        ServiceUnavailableException,
-        BadGatewayException,
-    ],
+    responses={
+        400: problem_response("Invalid A-Number, nationality or request body"),
+        404: problem_response("No case found"),
+        422: problem_response("Case unavailable"),
+        429: problem_response("Too many pending lookups, or daily quota exceeded"),
+        502: problem_response("EOIR lookup failed"),
+        503: problem_response("Lookups temporarily unavailable"),
+    },
 )
 async def lookup_case(
     *,
@@ -164,7 +185,7 @@ async def fetch_case(
         raise TooManyRequestsException(
             "Daily quota exceeded",
             headers=retry_after_header(exc.retry_after),
-            extra={"reason": "quota_exceeded"},
+            extra={"code": "quota_exceeded"},
         ) from exc
     except QueueTimeoutError as exc:
         if exc.max_concurrency is not None:

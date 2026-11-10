@@ -11,6 +11,7 @@ from litestar import Controller, Request, get, post
 from litestar.datastructures import State
 from litestar.di import NamedDependency
 from litestar.exceptions import NotAuthorizedException, ValidationException
+from litestar.exceptions.responses import create_exception_response
 from litestar.params import CookieParameter, QueryParameter, URLEncodedBody
 from litestar.plugins.jinja import JinjaTemplateEngine
 from litestar.response import Redirect, Template
@@ -93,6 +94,7 @@ class PortalController(Controller):
     exception_handlers = {
         NotAuthorizedException: login_redirect,
         ValidationException: portal_redirect,
+        Exception: create_exception_response,
     }
 
     @get()

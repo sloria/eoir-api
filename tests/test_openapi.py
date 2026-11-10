@@ -14,6 +14,16 @@ async def test_schema_documents_responses(client):
     assert "503" in responses
 
 
+async def test_schema_documents_errors_as_problem_details(client):
+    spec = (await client.get("/schema/openapi.json")).json()
+    responses = spec["paths"]["/cases/lookup"]["post"]["responses"]
+    errors = {code: r for code, r in responses.items() if code != "200"}
+    assert errors
+    assert all(
+        list(r["content"]) == ["application/problem+json"] for r in errors.values()
+    )
+
+
 async def test_schema_documents_lookup_body(client):
     spec = (await client.get("/schema/openapi.json")).json()
     body = spec["paths"]["/cases/lookup"]["post"]["requestBody"]["content"]
