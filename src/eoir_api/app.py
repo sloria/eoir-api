@@ -5,7 +5,6 @@ import logging
 import sys
 import time
 from contextlib import asynccontextmanager
-from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -18,7 +17,6 @@ from litestar import Litestar, Request
 from litestar.config.csrf import CSRFConfig
 from litestar.datastructures import State
 from litestar.di import Provide
-from litestar.exceptions import HTTPException, InternalServerException
 from litestar.logging.config import (
     LoggingConfig,
     StructLoggingConfig,
@@ -32,14 +30,8 @@ from litestar.openapi import OpenAPIConfig
 from litestar.openapi.plugins import ScalarRenderPlugin
 from litestar.openapi.spec import Components, SecurityScheme
 from litestar.plugins.jinja import JinjaTemplateEngine
-from litestar.plugins.problem_details import (
-    ProblemDetailsConfig,
-    ProblemDetailsException,
-    ProblemDetailsPlugin,
-)
 from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 from litestar.static_files import create_static_files_router
-from litestar.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
 from litestar.template import TemplateConfig
 from sentry_sdk.integrations.litestar import LitestarIntegration
 from sqlspec import SQLSpec
@@ -138,21 +130,17 @@ def make_usage_lifespan(
 
 
 API_DESCRIPTION = """\
-Look up case information from EOIR's [Automated Case Information System (ACIS)](https://acis.eoir.justice.gov/).
+Look up cases in EOIR's [Automated Case Information System (ACIS)](https://acis.eoir.justice.gov/).
 
 Authenticate by sending your API key in the `x-api-key` header.
 
 ## Retrying
 
-Lookups run against a slow upstream with limited capacity. `429` and `503` responses are expected in normal operation, so clients must handle them.
+Lookups run against a slow upstream. `429` and `503` responses are expected in normal operation, so clients must handle them.
 
 **Always honor `Retry-After`.** Wait at least that long before sending the request again.
 
 A `429` usually means too many lookups are pending, and the wait is typically seconds. If `code` is `quota_exceeded`, your daily quota is used up, and the wait can be hours. A `503` means lookups are temporarily unavailable, and the wait can be seconds to minutes.
-
-## Errors
-
-Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details, sent as `application/problem+json`.
 
 ## Quota
 
@@ -160,7 +148,7 @@ Your key has a quota over a rolling 24-hour window. Check your usage in the [API
 
 ## Caching
 
-Successful results are cached for a few hours. Check `cached` and `retrieved_at` in the response. Set `refresh` to `true` to force a fresh lookup, which counts against quota.
+Successful lookups are cached for 3 hours. Check `cached` and `retrieved_at` in the response. Set `refresh` to `true` to force a fresh lookup, which counts against quota.
 """
 
 
@@ -192,23 +180,6 @@ def create_openapi_config() -> OpenAPIConfig:
             }
         ),
         security=[{"apiKey": []}],
-    )
-
-
-def to_problem_details(exc: Exception) -> ProblemDetailsException:
-    """Convert an exception to a problem response, hiding the message of any 500."""
-    http = (
-        exc
-        if isinstance(exc, HTTPException)
-        and exc.status_code != HTTP_500_INTERNAL_SERVER_ERROR
-        else InternalServerException()
-    )
-    return ProblemDetailsException(
-        status_code=http.status_code,
-        title=HTTPStatus(http.status_code).phrase,
-        detail=http.detail,
-        headers=http.headers,
-        extra=http.extra,
     )
 
 
@@ -364,15 +335,7 @@ def build_app(
             TenantAuthMiddleware(settings.tenants),
         ],
         csrf_config=csrf,
-        plugins=[
-            SQLSpecPlugin(sqlspec=spec),
-            ProblemDetailsPlugin(
-                ProblemDetailsConfig(
-                    exception_to_problem_detail_map={Exception: to_problem_details}
-                )
-            ),
-            *plugins,
-        ],
+        plugins=[SQLSpecPlugin(sqlspec=spec), *plugins],
         lifespan=[
             make_usage_lifespan(usage_service, usage_config),
             *lifespan,

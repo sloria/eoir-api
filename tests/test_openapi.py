@@ -14,14 +14,14 @@ async def test_schema_documents_responses(client):
     assert "503" in responses
 
 
-async def test_schema_documents_errors_as_problem_details(client):
+async def test_schema_documents_code_only_on_429(client):
     spec = (await client.get("/schema/openapi.json")).json()
     responses = spec["paths"]["/cases/lookup"]["post"]["responses"]
-    errors = {code: r for code, r in responses.items() if code != "200"}
-    assert errors
-    assert all(
-        list(r["content"]) == ["application/problem+json"] for r in errors.values()
-    )
+    too_many = responses["429"]["content"]["application/json"]["schema"]
+    ref = too_many["$ref"].rsplit("/", 1)[-1]
+    assert "code" in spec["components"]["schemas"][ref]["properties"]
+    not_found = responses["404"]["content"]["application/json"]["schema"]
+    assert "code" not in not_found["properties"]
 
 
 async def test_schema_documents_lookup_body(client):
