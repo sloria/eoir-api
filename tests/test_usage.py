@@ -33,7 +33,7 @@ async def test_lookup_at_quota_returns_429_until_oldest_ages_out(
     response = await lookup(client)
     assert response.status_code == 429
     assert response.json()["detail"] == "Daily quota exceeded"
-    assert response.json()["extra"] == {"reason": "quota_exceeded"}
+    assert response.json()["code"] == "quota_exceeded"
     assert response.headers["Retry-After"] == "3600"
     assert response.headers["X-RateLimit-Limit"] == "5"
     assert response.headers["X-RateLimit-Remaining"] == "0"
