@@ -29,17 +29,15 @@ LABELS: dict[LookupOutcome, str] = {
     "captcha": "Captcha failed",
     "upstream_error": "Upstream error",
 }
-PAGE_SIZE = 20
+PAGE_SIZE = 10
 
 
 class Login(msgspec.Struct):
     key: str
 
 
-def status_class(outcome: LookupOutcome) -> str:
-    if outcome == "ok":
-        return "ok"
-    return "err" if outcome in FAILED else "warn"
+def failed(value: LookupOutcome) -> bool:
+    return value in FAILED
 
 
 def duration(ms: int | None) -> str:
@@ -50,8 +48,9 @@ def duration(ms: int | None) -> str:
 
 def register_filters(engine: JinjaTemplateEngine) -> None:
     engine.engine.filters.update(
-        status_class=status_class, outcome_label=LABELS.__getitem__, duration=duration
+        outcome_label=LABELS.__getitem__, duration=duration, number="{:,}".format
     )
+    engine.engine.tests["failed"] = failed
 
 
 def login_redirect(request: Request[Any, Any, State], exc: Exception) -> Redirect:
@@ -127,7 +126,7 @@ class PortalController(Controller):
         range_ = {k: v for k, v in (("from", from_), ("to", to)) if v}
 
         def page_url(**params: str) -> str:
-            return f"/portal?{urlencode({**range_, **params})}#lookups"
+            return f"/portal?{urlencode({**range_, **params})}"
 
         return Template(
             "portal.html",
