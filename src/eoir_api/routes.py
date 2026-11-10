@@ -71,16 +71,21 @@ class Problem(msgspec.Struct):
     status: int
     title: str
     detail: str
+    extra: list[dict[str, Any]] | None = None
+
+
+class TooManyRequestsProblem(Problem):
     code: Annotated[
         str | None,
         msgspec.Meta(description="`quota_exceeded` when the daily quota is used up."),
     ] = None
-    extra: list[dict[str, Any]] | None = None
 
 
-def problem_response(description: str) -> ResponseSpec:
+def problem_response(
+    description: str, container: type[Problem] = Problem
+) -> ResponseSpec:
     return ResponseSpec(
-        data_container=Problem,
+        data_container=container,
         description=description,
         generate_examples=False,
         media_type="application/problem+json",
@@ -130,7 +135,10 @@ def health() -> Response:
         400: problem_response("Invalid A-Number, nationality or request body"),
         404: problem_response("No case found"),
         422: problem_response("Case unavailable"),
-        429: problem_response("Too many pending lookups, or daily quota exceeded"),
+        429: problem_response(
+            "Too many pending lookups, or daily quota exceeded",
+            TooManyRequestsProblem,
+        ),
         502: problem_response("EOIR lookup failed"),
         503: problem_response("Lookups temporarily unavailable"),
     },
