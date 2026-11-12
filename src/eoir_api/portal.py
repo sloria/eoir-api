@@ -26,7 +26,7 @@ LABELS: dict[LookupOutcome, str] = {
     "not_found": "Not found",
     "invalid_nationality": "Invalid nationality",
     "unavailable": "Case unavailable",
-    "captcha": "Captcha failed",
+    "captcha": "Temporarily unavailable",
     "upstream_error": "Upstream error",
 }
 PAGE_SIZE = 10

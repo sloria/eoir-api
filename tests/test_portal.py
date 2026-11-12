@@ -170,7 +170,7 @@ async def test_portal_lookups_are_tenant_scoped(client, usage_service):
     await seed(usage_service, dt.timedelta(hours=1), tenant="owner", outcome="captcha")
     await login(client)
     text = (await portal(client)).text
-    assert "Captcha failed" not in text
+    assert "Temporarily unavailable" not in text
     assert "No lookups" in text
 
 
