@@ -18,6 +18,8 @@ secret = { env = "PORTAL_SECRET" }
 [server]
 host = "127.0.0.1"
 port = 8001
+# Header holding the client's IP, set by a reverse proxy, e.g. "CF-Connecting-IP"
+# client_ip_header = ""
 
 [chrome]
 # Where to store browser profiles.

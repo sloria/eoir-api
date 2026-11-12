@@ -67,6 +67,21 @@ async def test_login_is_rate_limited_but_lookups_are_not(client):
     assert (await lookup(client)).status_code == 200
 
 
+async def test_login_rate_limit_is_per_client_ip_header(settings, service):
+    server = msgspec.structs.replace(
+        settings.server, client_ip_header="CF-Connecting-IP"
+    )
+    settings = msgspec.structs.replace(settings, server=server)
+    app = build_app(settings, service)
+    async with AsyncTestClient(app=app) as attacker, AsyncTestClient(app=app) as user:
+        attacker.headers["CF-Connecting-IP"] = "203.0.113.1"
+        user.headers["CF-Connecting-IP"] = "203.0.113.2"
+        for _ in range(11):
+            await login(attacker, key="nope")
+        assert (await login(attacker, key="nope")).status_code == 429
+        assert (await login(user)).status_code == 303
+
+
 async def test_portal_without_session_redirects_to_login(client):
     response = await portal(client)
     assert response.status_code == 302

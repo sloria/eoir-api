@@ -36,6 +36,7 @@ class _Base(msgspec.Struct, kw_only=True, forbid_unknown_fields=True):
 class Server(_Base):
     host: str = "127.0.0.1"
     port: int = 8001
+    client_ip_header: str | None = None
 
 
 class Chrome(_Base):
