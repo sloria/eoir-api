@@ -32,7 +32,7 @@ requires-dist = [
 
 [[package]]
 name = "acis-core"
-version = "1.2.1"
+version = "1.2.2"
 source = { editable = "packages/acis-core" }
 
 [[package]]

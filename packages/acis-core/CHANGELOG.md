@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/sloria/eoir-api/compare/acis-core-v1.2.1...acis-core-v1.2.2) (2026-11-13)
+
+
+### Bug Fixes
+
+* **acis-core:** reject ambiguous nationality names; accept former country codes ([#94](https://github.com/sloria/eoir-api/issues/94)) ([e05a83a](https://github.com/sloria/eoir-api/commit/e05a83aca502ddf67ed2e53d966aa2ff271785bb))
+
 ## [1.2.1](https://github.com/sloria/eoir-api/compare/acis-core-v1.2.0...acis-core-v1.2.1) (2026-11-07)
 
 
