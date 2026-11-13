@@ -262,6 +262,15 @@ def create_app(settings: Settings) -> Litestar:
     return build_app(settings, service, plugins=plugins, lifespan=lifespan)
 
 
+def client_ip(header: str | None) -> Callable[[Request], str]:
+    def identify(request: Request) -> str:
+        if header and (ip := request.headers.get(header)):
+            return ip
+        return request.client.host if request.client else "anonymous"
+
+    return identify
+
+
 def build_app(
     settings: Settings,
     service: CaseService,
@@ -315,6 +324,7 @@ def build_app(
                 request.method == "POST" and request.url.path == "/portal/login"
             ),
             set_rate_limit_headers=False,
+            identifier_for_request=client_ip(settings.server.client_ip_header),
         )
         route_handlers.append(PortalController)
         # Session must go before TenantAuthMiddleware
