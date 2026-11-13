@@ -14,7 +14,7 @@ dependencies = [
     "litestar[cryptography,jinja,standard,structlog]>=2.14.0",
     "platformdirs>=4.13.5",
     "sentry-sdk[litestar]>=2.42.1",
-    "sqlspec[aiosqlite,litestar,msgspec]==0.70.0",
+    "sqlspec[aiosqlite,litestar,msgspec]==0.71.0",
     "structlog>=25.1.0",
     "uvicorn>=0.54.0",
 ]
