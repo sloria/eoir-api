@@ -17,8 +17,7 @@ class UnknownNationalityError(AcisError):
     """Raised when a nationality code or name can't be resolved."""
 
 
-# Placeholder entry in the upstream table; never a valid lookup value.
-UNKNOWN_CODE = "??"
+PLACEHOLDER_CODES = frozenset({"??", "XX"})
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -28,18 +27,18 @@ class Nationality:
 
 
 @cache
-def _tables() -> tuple[dict[str, Nationality], dict[str, Nationality]]:
-    """Return (by_code, by_name) lookup tables of active nationalities."""
+def _tables() -> tuple[dict[str, Nationality], dict[str, list[Nationality]]]:
+    """Return (by_code, by_name) lookup tables; names may map to several codes."""
     raw = json.loads(REFERENCE_FILE.read_text(encoding="utf-8"))
     by_code: dict[str, Nationality] = {}
-    by_name: dict[str, Nationality] = {}
+    by_name: dict[str, list[Nationality]] = {}
     for entry in raw:
         code = entry["Code"].strip().upper()
-        if not entry.get("IsActive") or code == UNKNOWN_CODE:
+        if code in PLACEHOLDER_CODES:
             continue
         nationality = Nationality(code=code, name=entry["Name"].strip().upper())
         by_code[nationality.code] = nationality
-        by_name[nationality.name] = nationality
+        by_name.setdefault(nationality.name, []).append(nationality)
     return by_code, by_name
 
 
@@ -66,6 +65,12 @@ def resolve(value: str) -> Nationality:
     by_code, by_name = _tables()
     if candidate in by_code:
         return by_code[candidate]
-    if candidate in by_name:
-        return by_name[candidate]
+    matches = by_name.get(candidate, [])
+    if len(matches) > 1:
+        codes = ", ".join(n.code for n in matches)
+        raise UnknownNationalityError(
+            f"Ambiguous nationality {value!r}; use one of the codes: {codes}"
+        )
+    if matches:
+        return matches[0]
     raise UnknownNationalityError(f"Unknown nationality: {value!r}")
