@@ -22,10 +22,20 @@ def test_resolve_by_name():
     assert resolve("El Salvador").code == "ES"
 
 
-@pytest.mark.parametrize("code", ["??", "GC", "UR", "XX", "YO"])
-def test_inactive_entries_are_rejected(code):
+@pytest.mark.parametrize("code", ["??", "XX"])
+def test_placeholder_entries_are_rejected(code):
     with pytest.raises(UnknownNationalityError):
         resolve(code)
+
+
+@pytest.mark.parametrize("code", ["CZ", "GC", "UR", "YO", "YS"])
+def test_former_countries_resolve_by_code(code):
+    assert resolve(code).code == code
+
+
+def test_name_shared_by_several_codes_is_rejected():
+    with pytest.raises(UnknownNationalityError, match="CZ, GC, UR, YO, YS"):
+        resolve("Former Countries")
 
 
 def test_empty_is_rejected():
@@ -47,5 +57,6 @@ def test_get_by_code_is_strict():
 def test_all_nationalities_lists_only_valid_codes_sorted():
     codes = [n.code for n in all_nationalities()]
     assert "MX" in codes
-    assert not {"??", "GC", "UR", "XX", "YO"} & set(codes)
+    assert {"GC", "UR", "YO"} <= set(codes)
+    assert not {"??", "XX"} & set(codes)
     assert codes == sorted(codes)
