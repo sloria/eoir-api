@@ -36,7 +36,7 @@ class Login(msgspec.Struct):
     key: str
 
 
-def failed(value: LookupOutcome) -> bool:
+def is_failed(value: LookupOutcome) -> bool:
     return value in FAILED
 
 
@@ -50,7 +50,7 @@ def register_filters(engine: JinjaTemplateEngine) -> None:
     engine.engine.filters.update(
         outcome_label=LABELS.__getitem__, duration=duration, number="{:,}".format
     )
-    engine.engine.tests["failed"] = failed
+    engine.engine.tests["failed"] = is_failed
 
 
 def login_redirect(request: Request[Any, Any, State], exc: Exception) -> Redirect:

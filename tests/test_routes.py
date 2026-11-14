@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 import structlog
-from acis_browser import (
+from acis_core.exceptions import (
     BrowserLostError,
     CaptchaError,
     CaseNotFoundError,
@@ -62,11 +62,12 @@ async def test_error_response_has_a_request_id(client):
 ##### Auth #####
 
 
-async def test_missing_secret_is_rejected(client):
+async def test_missing_secret_is_rejected_before_any_lookup(client, browser):
     response = await lookup(
         client, {"a_number": A_NUMBER, "nationality": "VE"}, headers={}
     )
     assert response.status_code == 401
+    assert browser.calls == []
 
 
 async def test_wrong_secret_is_rejected(client):
@@ -82,24 +83,14 @@ async def test_wrong_secret_is_rejected(client):
     ("key", "tenant"),
     [("owner-test-secret", "owner"), ("metered-test-secret", "metered")],
 )
-async def test_api_key_resolves_tenant_in_lookup_logs(client, key, tenant):
-    with structlog.testing.capture_logs(
-        processors=[structlog.contextvars.merge_contextvars]
-    ) as logs:
-        response = await lookup(
-            client,
-            {"a_number": A_NUMBER, "nationality": "VE"},
-            headers={"x-api-key": key},
-        )
+async def test_api_key_resolves_tenant_in_lookup_logs(client, logs, key, tenant):
+    response = await lookup(
+        client, {"a_number": A_NUMBER, "nationality": "VE"}, headers={"x-api-key": key}
+    )
     assert response.status_code == 200
     lookup_events = [e for e in logs if e["event"].startswith("lookup.")]
     assert lookup_events
     assert all(e["tenant"] == tenant for e in lookup_events)
-
-
-async def test_auth_is_checked_before_any_lookup(client, browser):
-    await lookup(client, {"a_number": A_NUMBER, "nationality": "VE"}, headers={})
-    assert browser.calls == []
 
 
 async def test_auth_is_checked_before_parameter_validation(client):
@@ -143,41 +134,22 @@ async def test_lookup_normalizes_a_number_before_calling_acis(client, browser):
 ##### Input errors #####
 
 
-async def test_bad_a_number_returns_400(client):
-    response = await lookup(client, {"a_number": "12345", "nationality": "VE"})
-    assert response.status_code == 400
-
-
-async def test_missing_nationality_returns_400(client):
-    response = await lookup(client, {"a_number": A_NUMBER})
-    assert response.status_code == 400
-
-
-async def test_unknown_nationality_returns_400(client):
-    response = await lookup(
-        client,
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"a_number": "12345", "nationality": "VE"},
+        {"a_number": A_NUMBER},
+        {"nationality": "VE"},
         {"a_number": A_NUMBER, "nationality": "ATLANTIS"},
-    )
+        {"a_number": A_NUMBER, "nationality": "DZ"},  # ISO-only code
+        {"a_number": A_NUMBER, "nationality": "VE", "refresh": "maybe"},
+        {"a_number": A_NUMBER, "nationality": "VE", "nat": "VE"},
+    ],
+)
+async def test_invalid_body_returns_400(client, browser, body):
+    response = await lookup(client, body)
     assert response.status_code == 400
-
-
-async def test_missing_a_number_returns_400(client):
-    response = await lookup(client, {"nationality": "VE"})
-    assert response.status_code == 400
-
-
-async def test_wrong_field_type_returns_400(client):
-    response = await lookup(
-        client, {"a_number": A_NUMBER, "nationality": "VE", "refresh": "maybe"}
-    )
-    assert response.status_code == 400
-
-
-async def test_unknown_field_returns_400(client):
-    response = await lookup(
-        client, {"a_number": A_NUMBER, "nationality": "VE", "nat": "VE"}
-    )
-    assert response.status_code == 400
+    assert browser.calls == []
 
 
 async def test_malformed_json_returns_400(client):
@@ -186,11 +158,6 @@ async def test_malformed_json_returns_400(client):
         content=b"{not json",
         headers={**HEADERS, "content-type": "application/json"},
     )
-    assert response.status_code == 400
-
-
-async def test_iso_only_code_returns_400(client):
-    response = await lookup(client, {"a_number": A_NUMBER, "nationality": "DZ"})
     assert response.status_code == 400
 
 

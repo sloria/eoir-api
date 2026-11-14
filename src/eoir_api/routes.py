@@ -5,7 +5,8 @@ from typing import Annotated, Any, Literal, cast
 
 import msgspec
 import structlog
-from acis_browser import (
+from acis_core.a_numbers import InvalidANumberError, normalize_a_number
+from acis_core.exceptions import (
     BrowserLostError,
     CaptchaError,
     CaseNotFoundError,
@@ -13,7 +14,6 @@ from acis_browser import (
     InvalidNationalityError,
     UpstreamError,
 )
-from acis_core.a_numbers import InvalidANumberError, normalize_a_number
 from acis_core.nationalities import UnknownNationalityError, resolve
 from litestar import Request, Response, get, post
 from litestar.di import NamedDependency

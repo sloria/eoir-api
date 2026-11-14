@@ -184,4 +184,7 @@ demo.html
 ##### Project-specific #####
 
 /profiles/
+/hub.toml
+/runner.toml
+# Old config file, replaced by hub.toml and runner.toml
 /config.toml

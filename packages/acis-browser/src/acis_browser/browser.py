@@ -11,20 +11,12 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Self
 
 import structlog
+from acis_core.exceptions import BrowserLostError, CaptchaError, UpstreamError
 from acis_core.outcome import Outcome
 from patchright._impl._errors import TargetClosedError  # not re-exported publicly
 from patchright.async_api import Error as PlaywrightError
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 from patchright.async_api import async_playwright
-
-from acis_browser.exceptions import (
-    BrowserLostError,
-    CaptchaError,
-    CaseNotFoundError,
-    CaseUnavailableError,
-    InvalidNationalityError,
-    UpstreamError,
-)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -50,25 +42,6 @@ BROWSER_LOST_ERRORS = (PlaywrightError, RuntimeError)
 
 def option_label(nat_name: str, nat_code: str) -> re.Pattern[str]:
     return re.compile(rf"^{re.escape(f'{nat_name} ({nat_code})')}$", re.IGNORECASE)
-
-
-def raise_for_outcome(payload: dict[str, Any]) -> None:
-    """Raise the exception matching the payload's outcome; return for a success."""
-    outcome = Outcome.from_payload(payload)
-    if outcome is Outcome.OK:
-        return
-    message = payload.get("message") or ""
-    if outcome is Outcome.CAPTCHA_REJECTED:
-        raise CaptchaError(
-            message, reason=CaptchaError.Reason.REJECTED, payload=payload
-        )
-    if outcome is Outcome.NOT_FOUND:
-        raise CaseNotFoundError(message, payload=payload)
-    if outcome is Outcome.INVALID_NATIONALITY:
-        raise InvalidNationalityError(message, payload=payload)
-    if outcome is Outcome.UNAVAILABLE:
-        raise CaseUnavailableError(message, payload=payload)
-    raise UpstreamError("ACIS returned an unexpected payload", payload=payload)
 
 
 ##### Browser #####

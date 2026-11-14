@@ -8,7 +8,8 @@ prek = "latest"
 [tasks.setup]
 description = "Set up the development environment"
 run = """
-test -f config.toml || cp config.example.toml config.toml
+test -f hub.toml || cp hub.example.toml hub.toml
+test -f runner.toml || cp runner.example.toml runner.toml
 test -f .env || cp .env.example .env
 uv sync --all-packages --all-groups
 uv run patchright install chrome
@@ -32,12 +33,16 @@ description = "Run live browser tests against the real ACIS site"
 run = "uv run pytest -m live"
 
 [tasks.dev]
-description = "Run the app server in development mode"
-run = "uv run eoir-api serve -c config.toml --reload --debug"
+description = "Run the hub and a runner in development mode"
+depends = ["hub", "runner"]
 
-[tasks.start]
-description = "Run the production server"
-run = "uv run --frozen eoir-api serve -c config.toml"
+[tasks.hub]
+description = "Run the hub in development mode"
+run = "uv run eoir-api hub -c hub.toml --reload --debug"
+
+[tasks.runner]
+description = "Run a runner that hosts browsers for the hub"
+run = "uv run eoir-api runner -c runner.toml"
 
 [tasks."refresh-reference"]
 description = "Re-fetch nationality codes and decision types from ACIS"
