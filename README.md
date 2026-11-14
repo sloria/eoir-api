@@ -63,11 +63,11 @@ Initial setup:
 mise setup
 ```
 
-This creates `config.toml` and `.env`. Fill in API_KEY and PORTAL_SECRET in .env
+This creates `hub.toml`, `runner.toml` and `.env`. Fill in API_KEY, PORTAL_SECRET and RUNNER_TOKEN in .env
 
-All settings are documented in [config.example.toml](config.example.toml).
+All settings are documented in [hub.example.toml](hub.example.toml) and [runner.example.toml](runner.example.toml).
 
-Run the dev server:
+Run the dev server (runs hub and runner components simultaneously):
 
 ```
 mise dev
@@ -89,10 +89,34 @@ EOIR_TEST_A_NUMBER=... EOIR_TEST_NATIONALITY=... mise run test:live
 
 ## Deployment
 
-Must run on a host machine with Google Chrome (cannot use headless).
+eoir-api has two components:
+
+- Hub (`eoir-api hub`): the API server. Configured by `hub.toml`
+- Runners (`eoir-api runner`): run browsers and perform lookups for the hub over HTTP. Configured by `runner.toml`.
+
+### Hub
+
+#### Directly
 
 ```bash
-uv run --frozen --no-dev eoir-api serve --config /path/to/config.toml
+uv run --frozen --no-dev eoir-api hub --config /path/to/hub.toml
+```
+
+#### Docker
+
+```bash
+docker build -t eoir-api .
+docker run -v ./hub.toml:/config/hub.toml:ro -v eoir-api-data:/data -p 8001:8001 eoir-api
+```
+
+It writes only to `/data`. Set `[server] host = "0.0.0.0"`.
+
+### Runner
+
+Needs a host with Google Chrome and a GUI session (cannot use headless).
+
+```bash
+uv run --frozen --no-dev eoir-api runner --config /path/to/runner.toml
 ```
 
 ## License

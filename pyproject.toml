@@ -8,9 +8,9 @@ license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
-    "acis-browser",
     "acis-core",
     "click>=8.5.0",
+    "httpx2>=2.16.0",
     "litestar[cryptography,jinja,standard,structlog]>=2.14.0",
     "platformdirs>=4.13.5",
     "sentry-sdk[litestar]>=2.42.1",
@@ -23,6 +23,7 @@ dependencies = [
 eoir-api = "eoir_api.cli:cli"
 
 [dependency-groups]
+browser = ["acis-browser"]
 dev = [
     "anyio>=4.0.0",
     "pytest>=8.3.4",
@@ -36,7 +37,7 @@ requires = ["flit_core<5"]
 build-backend = "flit_core.buildapi"
 
 [tool.uv]
-default-groups = ["dev"]
+default-groups = ["browser", "dev"]
 exclude-newer = "1 week"
 
 [tool.uv.workspace]
