@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.7.0...acis-browser-v3.8.0) (2026-11-15)
+
+
+### Features
+
+* **acis-browser:** purge local storage etc ([#98](https://github.com/sloria/eoir-api/issues/98)) ([dfe1cd7](https://github.com/sloria/eoir-api/commit/dfe1cd7f39a21a5b684b5ce71f6ca3a33b3afb13))
+
 ## [3.7.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.6.0...acis-browser-v3.7.0) (2026-11-09)
 
 
