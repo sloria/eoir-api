@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.1](https://github.com/sloria/eoir-api/compare/acis-browser-v3.8.0...acis-browser-v3.8.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* prevent on-disk caching within browser profiles ([#100](https://github.com/sloria/eoir-api/issues/100)) ([39a8f8b](https://github.com/sloria/eoir-api/commit/39a8f8b362c8ccf55243fa0add5627689c59a7b2))
+
 ## [3.8.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.7.0...acis-browser-v3.8.0) (2026-11-15)
 
 
