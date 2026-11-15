@@ -51,7 +51,9 @@ BROWSER_LOST_ERRORS = (PlaywrightError, RuntimeError)
 
 
 def purge_site_storage(profile_dir: Path) -> None:
+    """Remove on-disk storage that could hold case data."""
     for name in (
+        "Cache",
         "IndexedDB",
         "Local Storage",
         "Service Worker",
@@ -125,6 +127,11 @@ class AcisBrowser:
             return
         self.profile_dir.mkdir(parents=True, exist_ok=True)
         purge_site_storage(self.profile_dir)
+        # XXX: A file where Chrome expects its cache dir makes the cache
+        # backend fail to start, so Chrome runs with no HTTP disk cache and
+        # case responses (keyed by a URL holding the A-number) never touch disk
+        cache_blocker = self.profile_dir / "disk-cache-disabled"
+        cache_blocker.touch()
         logger.info("browser starting", profile=str(self.profile_dir))
         self._playwright = await async_playwright().start()
         self._context = await self._playwright.chromium.launch_persistent_context(
@@ -133,6 +140,7 @@ class AcisBrowser:
             headless=False,
             no_viewport=True,
             proxy=self.proxy,
+            args=[f"--disk-cache-dir={cache_blocker}"],
         )
 
     async def close(self) -> None:

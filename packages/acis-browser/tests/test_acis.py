@@ -362,7 +362,12 @@ async def test_close_waits_for_an_in_flight_lookup(acis_browser):
 
 def test_purging_site_storage_keeps_cookies(tmp_path):
     default = tmp_path / "Default"
-    for name in ("Local Storage/leveldb", "Session Storage", "Sessions"):
+    for name in (
+        "Cache/Cache_Data",
+        "Local Storage/leveldb",
+        "Session Storage",
+        "Sessions",
+    ):
         (default / name).mkdir(parents=True)
         (default / name / "data").write_text("case")
     (default / "Cookies").write_text("hi")
