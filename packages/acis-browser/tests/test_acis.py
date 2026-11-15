@@ -18,7 +18,7 @@ from acis_browser import (
     UpstreamError,
     raise_for_outcome,
 )
-from acis_browser.browser import _Capture, option_label
+from acis_browser.browser import _Capture, option_label, purge_site_storage
 
 pytestmark = pytest.mark.anyio
 
@@ -358,3 +358,15 @@ async def test_close_waits_for_an_in_flight_lookup(acis_browser):
     finish.set()
     await asyncio.gather(lookup, close)
     assert events == ["lookup", "close"]
+
+
+def test_purging_site_storage_keeps_cookies(tmp_path):
+    default = tmp_path / "Default"
+    for name in ("Local Storage/leveldb", "Session Storage", "Sessions"):
+        (default / name).mkdir(parents=True)
+        (default / name / "data").write_text("case")
+    (default / "Cookies").write_text("hi")
+
+    purge_site_storage(tmp_path)
+
+    assert [p.name for p in default.iterdir()] == ["Cookies"]

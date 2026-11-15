@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import json
 import re
+import shutil
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Self
@@ -41,11 +42,25 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
-ACIS_URL = "https://acis.eoir.justice.gov/en/"
+ACIS_ORIGIN = "https://acis.eoir.justice.gov"
+ACIS_URL = f"{ACIS_ORIGIN}/en/"
 HCAPTCHA_IFRAME = 'iframe[src*="hcaptcha.com"]'
 CHALLENGE_IFRAME = f'{HCAPTCHA_IFRAME}[src*="frame=challenge"]'
 
 BROWSER_LOST_ERRORS = (PlaywrightError, RuntimeError)
+
+
+def purge_site_storage(profile_dir: Path) -> None:
+    for name in (
+        "IndexedDB",
+        "Local Storage",
+        "Service Worker",
+        "Session Storage",
+        "Sessions",
+        "Sessions_Encrypted",
+        "WebStorage",
+    ):
+        shutil.rmtree(profile_dir / "Default" / name, ignore_errors=True)
 
 
 def option_label(nat_name: str, nat_code: str) -> re.Pattern[str]:
@@ -109,6 +124,7 @@ class AcisBrowser:
         if self._context is not None:
             return
         self.profile_dir.mkdir(parents=True, exist_ok=True)
+        purge_site_storage(self.profile_dir)
         logger.info("browser starting", profile=str(self.profile_dir))
         self._playwright = await async_playwright().start()
         self._context = await self._playwright.chromium.launch_persistent_context(
@@ -128,6 +144,7 @@ class AcisBrowser:
             logger.info("browser stopping")
             try:
                 await self._context.close()
+                purge_site_storage(self.profile_dir)
             except BROWSER_LOST_ERRORS as exc:
                 logger.warning("browser.close_failed", error=str(exc))
             finally:
@@ -242,11 +259,30 @@ class AcisBrowser:
             raise UpstreamError("Could not lookup case") from exc
         finally:
             try:
+                await self._clear_site_storage(page)
+            except BROWSER_LOST_ERRORS as exc:
+                logger.warning("could not clear site storage", error=str(exc))
+            try:
                 await page.close()
             except BROWSER_LOST_ERRORS:
                 logger.warning("could not close page")
 
         return self._parse(captured)
+
+    async def _clear_site_storage(self, page: Page) -> None:
+        # Unload the app first, or it could write after the clear
+        with contextlib.suppress(PlaywrightTimeoutError):
+            await page.goto("about:blank", timeout=5_000)
+        cdp = await page.context.new_cdp_session(page)
+        await cdp.send(
+            "Storage.clearDataForOrigin",
+            {
+                "origin": ACIS_ORIGIN,
+                "storageTypes": (
+                    "local_storage,indexeddb,cache_storage,service_workers"
+                ),
+            },
+        )
 
     async def _wait_for_response(self, page: Page, captured: _Capture) -> None:
         """Wait for the case response, giving up early on a visible challenge."""
