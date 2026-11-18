@@ -340,14 +340,18 @@ class AcisBrowser:
         return True
 
     async def _dismiss_modal(self, page: Page) -> None:
-        try:
-            await page.wait_for_selector(".ReactModal__Overlay", timeout=500)
-        except PlaywrightTimeoutError:
+        overlay = ".ReactModal__Overlay"
+        # Set on accept, expires after 30 min; the modal shows only without it
+        cookies = await page.context.cookies(ACIS_URL)
+        accepted = any(
+            c["name"] == "disclaimer" and c["value"] == "true" for c in cookies
+        )
+        if accepted and not await page.locator(overlay).count():
+            return
+        if not await self._wait_for(page, overlay, "consent modal", timeout_ms=500):
             return
         await page.locator(".ReactModalPortal button").last.click()
-        await self._wait_for(
-            page, ".ReactModal__Overlay", "consent modal to close", state="detached"
-        )
+        await self._wait_for(page, overlay, "consent modal to close", state="detached")
 
     async def _wait_for_captcha(self, page: Page) -> None:
         if not await self._wait_for(
