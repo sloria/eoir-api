@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
-from acis_browser import CaptchaError, CaseNotFoundError, UpstreamError
+from acis_core.exceptions import CaptchaError, CaseNotFoundError, UpstreamError
 
 from .conftest import NOW, OWNER, lookup, lookup_rows, seed
 

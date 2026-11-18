@@ -1,0 +1,35 @@
+# runner config
+# Values shown are defaults.
+
+# `name` must match one of `browsers` in hub.toml
+browsers = [
+  { name = "default" },
+  # { name = "proxied-1", proxy = { server = "socks5://127.0.0.1:1080" } },
+  # { name = "proxied-2", proxy = { server = "socks5://127.0.0.1:1080", username = { env = "PROXY_USER" }, password = { env = "PROXY_PASS" } } },
+]
+
+[runner]
+host = "127.0.0.1"
+port = 8002
+# Bearer token the hub sends
+token = { env = "RUNNER_TOKEN" }
+
+[chrome]
+# Where to store browser profiles.
+# Defaults to the  platform user data dir.
+# profiles_dir = "~/Library/Application Support/eoir-api/profiles"
+
+# Seconds of inactivity before Chrome is torn down
+idle_timeout = 900
+
+[lookup]
+# Seconds to wait for one lookup attempt to produce a response
+timeout = 20
+# Attempts per browser before giving up on a lookup (>= 1)
+attempts = 1
+
+[sentry]
+# Sentry DSN; empty disables Sentry. e.g. { env = "SENTRY_DSN" }
+dsn = ""
+# Sentry environment; empty uses Sentry's default
+environment = ""

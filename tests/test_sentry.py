@@ -4,12 +4,12 @@ import json
 
 import pytest
 import sentry_sdk
-from acis_browser import CaptchaError
+from acis_core.exceptions import CaptchaError
 from sentry_sdk.integrations.litestar import LitestarIntegration
 from sentry_sdk.transport import Transport
 
-from eoir_api.app import scrub_sentry_event
 from eoir_api.exceptions import BrowserUnavailableError
+from eoir_api.observability import scrub_sentry_event
 
 A_NUMBER = "999999999"
 

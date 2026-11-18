@@ -6,18 +6,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import httpx2
 import msgspec
 import pytest
-from acis_browser import CaseNotFoundError
+import structlog
+from acis_core.exceptions import CaseNotFoundError
 from litestar.testing import AsyncTestClient
 from sqlspec import SQLSpec
 
 from eoir_api.app import build_app
+from eoir_api.remote import RunnerClient
 from eoir_api.service import CaseService
 from eoir_api.settings import (
-    Chrome,
+    Browser,
     Lookup,
     Portal,
+    Runner,
     Secret,
     Settings,
     Tenant,
@@ -39,6 +43,7 @@ NOW = dt.datetime(2026, 7, 25, 12, 0, tzinfo=dt.UTC)
 OWNER = {"x-api-key": "owner-test-secret"}
 METERED = {"x-api-key": "metered-test-secret"}
 BODY = {"a_number": "123456789", "nationality": "VE"}
+RUNNER_TOKEN = "runner-test-token"
 
 
 # Required for pytest-anyio
@@ -63,6 +68,8 @@ def master_hearing() -> dict[str, Any]:
 
 
 class FakeAcisBrowser:
+    is_available = True
+
     def __init__(self, payload: dict[str, Any] | None = None) -> None:
         self.payload = payload
         self.error: Exception | None = None
@@ -88,7 +95,8 @@ def settings(tmp_path) -> Settings:
             Tenant(name="metered", key=Secret("metered-test-secret"), quota_per_day=5),
         ],
         portal=Portal(secret=Secret("portal-secret")),
-        chrome=Chrome(profiles_dir=tmp_path / "profiles"),
+        runners=[Runner(name="mac", url="http://mac:8002", token=Secret(RUNNER_TOKEN))],
+        browsers=[Browser(name="direct", runner="mac")],
         lookup=Lookup(interval=0),
         usage=Usage(db_path=tmp_path / "usage.sqlite"),
     )
@@ -97,6 +105,26 @@ def settings(tmp_path) -> Settings:
 @pytest.fixture
 def browser(master_hearing) -> FakeAcisBrowser:
     return FakeAcisBrowser(payload=master_hearing)
+
+
+@pytest.fixture
+def logs():
+    with structlog.testing.capture_logs(
+        processors=[structlog.contextvars.merge_contextvars]
+    ) as captured:
+        yield captured
+
+
+@pytest.fixture
+def runner_browser(master_hearing) -> FakeAcisBrowser:
+    return FakeAcisBrowser(payload=master_hearing)
+
+
+def mock_runner(handler, name: str = "mac") -> RunnerClient:
+    client = httpx2.AsyncClient(
+        transport=httpx2.MockTransport(handler), base_url=f"http://{name}"
+    )
+    return RunnerClient(name, client)
 
 
 @dataclass

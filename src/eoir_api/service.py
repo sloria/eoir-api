@@ -13,15 +13,15 @@ from typing import Any, Protocol
 import anyio
 import msgspec
 import structlog
-from acis_browser import (
+from acis_core.exceptions import (
+    BrowserLostError,
     CaptchaError,
     CaseNotFoundError,
     CaseUnavailableError,
     InvalidNationalityError,
-    Outcome,
-    raise_for_outcome,
 )
 from acis_core.nationalities import Nationality
+from acis_core.outcome import Outcome, raise_for_outcome
 
 from eoir_api.exceptions import (
     BrowserUnavailableError,
@@ -44,19 +44,33 @@ class SupportsLookup(Protocol):
     ) -> dict[str, Any]: ...
 
 
+class PooledBrowser(SupportsLookup, Protocol):
+    @property
+    def is_available(self) -> bool: ...
+
+
 @dataclass(eq=False)  # eq=False to make slots hashable (usable in a set)
 class BrowserSlot:
     """Container for a browser and its pacing state."""
 
     name: str
-    browser: SupportsLookup
-    group: str | None
+    browser: PooledBrowser
+    group: str | None = None
+    runner: str | None = None
+    """Runner hosting the browser."""
     lock: anyio.Lock = field(default_factory=anyio.Lock)
     last_started: float = -math.inf
     cooldown_until: float = -math.inf
 
-    def in_cooldown(self, now: float) -> bool:
-        return now < self.cooldown_until
+    def is_available(self, now: float) -> bool:
+        return now >= self.cooldown_until and self.browser.is_available
+
+    @property
+    def log_fields(self) -> dict[str, str | None]:
+        fields = {"browser": self.name, "group": self.group}
+        if self.runner is not None:
+            fields["runner"] = self.runner
+        return fields
 
 
 OUTCOMES: dict[type[Exception], LookupOutcome] = {
@@ -64,7 +78,7 @@ OUTCOMES: dict[type[Exception], LookupOutcome] = {
     InvalidNationalityError: "invalid_nationality",
     CaseUnavailableError: "unavailable",
     CaptchaError: "captcha",
-    # Every browser left is cooling down after a captcha failure
+    # Every browser left is cooling down after a captcha failure or its runner is down
     BrowserUnavailableError: "captcha",
 }
 
@@ -85,7 +99,7 @@ class Case(msgspec.Struct):
 class CaseService:
     """Looks up cases on one or more browsers. Handles caching and pacing."""
 
-    browsers: Mapping[str, SupportsLookup]
+    browsers: Mapping[str, PooledBrowser]
     settings: Settings
     clock: Callable[[], float] = time.monotonic
 
@@ -100,10 +114,11 @@ class CaseService:
         self._cache: TTLCache[dict[str, Any]] = TTLCache(
             ttl=self.settings.lookup.cache_ttl
         )
-        groups = {b.name: b.group for b in self.settings.browsers}
-        self._slots = [
-            BrowserSlot(name, b, groups.get(name)) for name, b in self.browsers.items()
-        ]
+        configs = {b.name: b for b in self.settings.browsers}
+        self._slots = [BrowserSlot(n, b) for n, b in self.browsers.items()]
+        for slot in self._slots:
+            if config := configs.get(slot.name):
+                slot.group, slot.runner = config.group, config.runner
 
     @property
     def pending(self) -> int:
@@ -113,7 +128,7 @@ class CaseService:
     def estimated_wait(self) -> float:
         """Projected seconds before a newly-arriving request would start."""
         now = self.clock()
-        available = sum(not slot.in_cooldown(now) for slot in self._slots)
+        available = sum(slot.is_available(now) for slot in self._slots)
         per_lookup = max(self.avg_lookup_seconds, self.settings.lookup.interval)
         return self._pending * per_lookup / max(1, available)
 
@@ -128,14 +143,13 @@ class CaseService:
             "No browser available for lookup.", retry_after=self.retry_after
         )
 
-    def _pick_browser(self, exclude: set[BrowserSlot]) -> BrowserSlot:
+    def _candidates(self, exclude: set[BrowserSlot]) -> list[BrowserSlot]:
         now = self.clock()
+        return [s for s in self._slots if s not in exclude and s.is_available(now)]
+
+    def _pick_browser(self, exclude: set[BrowserSlot]) -> BrowserSlot:
         tried_groups = {slot.group for slot in exclude} - {None}
-        candidates = [
-            slot
-            for slot in self._slots
-            if slot not in exclude and not slot.in_cooldown(now)
-        ]
+        candidates = self._candidates(exclude)
         if not candidates:
             raise self._unavailable()
         return min(
@@ -167,24 +181,20 @@ class CaseService:
             slot = self._pick_browser(tried)
             async with slot.lock:
                 now = self.clock()
-                if slot.in_cooldown(now):  # cooled down while waiting for the lock
+                # It may have cooled down or lost its runner while we waited
+                if not slot.is_available(now):
                     continue
                 tried.add(slot)
                 delay = self.settings.lookup.interval - (now - slot.last_started)
                 if delay > 0:
                     if delay >= 1:
                         logger.info(
-                            "lookup.pacing",
-                            browser=slot.name,
-                            group=slot.group,
-                            delay=round(delay),
+                            "lookup.pacing", **slot.log_fields, delay=round(delay)
                         )
                     await anyio.sleep(delay)
                 slot.last_started = self.clock()
                 try:
-                    with structlog.contextvars.bound_contextvars(
-                        browser=slot.name, group=slot.group
-                    ):
+                    with structlog.contextvars.bound_contextvars(**slot.log_fields):
                         payload = await slot.browser.lookup(
                             a_number, nationality.code, nationality.name
                         )
@@ -195,12 +205,16 @@ class CaseService:
                         )
                         logger.warning(
                             "lookup.cooldown",
-                            browser=slot.name,
-                            group=slot.group,
+                            **slot.log_fields,
                             seconds=self.settings.lookup.captcha_cooldown,
                         )
                     if len(tried) >= max_browsers:
                         logger.warning("lookup.capped", browsers=len(tried))
+                        raise
+                    continue
+                except BrowserLostError:
+                    # Lookups are read-only, so it can retry elsewhere
+                    if len(tried) >= max_browsers or not self._candidates(tried):
                         raise
                     continue
                 finally:
@@ -260,7 +274,7 @@ class CaseService:
                 max_concurrency=max_concurrency,
             )
         now = self.clock()
-        if all(slot.in_cooldown(now) for slot in self._slots):
+        if not any(slot.is_available(now) for slot in self._slots):
             raise self._unavailable()
         wait = self.estimated_wait
         if wait > self.settings.lookup.max_queue_wait:
@@ -278,12 +292,7 @@ class CaseService:
             payload, slot, duration = await self._lookup(a_number, nationality)
             upstream = Outcome.from_payload(payload)
             if upstream is not Outcome.OK:
-                logger.info(
-                    "lookup.no_case",
-                    browser=slot.name,
-                    group=slot.group,
-                    outcome=upstream,
-                )
+                logger.info("lookup.no_case", **slot.log_fields, outcome=upstream)
             raise_for_outcome(payload)
         except Exception as exc:
             outcome = outcome_of(exc)
@@ -306,8 +315,7 @@ class CaseService:
         entry = self._cache.set(key, payload)
         logger.info(
             "lookup.success",
-            browser=slot.name,
-            group=slot.group,
+            **slot.log_fields,
             duration=round(duration, 1),
             elapsed=round(self.clock() - started, 1),
         )

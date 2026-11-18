@@ -1,6 +1,19 @@
+# hub config
 # Values shown are defaults.
 
 debug = false
+
+# Runners (`eoir-api runner`) hosting the browsers. `token` must match the runner's.
+runners = [
+  { name = "local", url = "http://127.0.0.1:8002", token = { env = "RUNNER_TOKEN" } },
+]
+
+# `name` must match one of `browsers` in runner.toml
+# `group` is optional: retries after a captcha try another group.
+browsers = [
+  { name = "default", runner = "local" },
+  # { name = "proxied-1", runner = "local", group = "region-1" },
+]
 
 [[tenants]]
 name = "owner"
@@ -21,17 +34,11 @@ port = 8001
 # Header holding the client's IP, set by a reverse proxy, e.g. "CF-Connecting-IP"
 # client_ip_header = ""
 
-[chrome]
-# Where to store browser profiles.
-# Default: platform user data dir, e.g. on macOS:
-# profiles_dir = "~/Library/Application Support/eoir-api/profiles"
-# Seconds of inactivity before Chrome is torn down
-idle_timeout = 900
-
 [lookup]
 # Minimum seconds between lookups on a single browser
 interval = 30
-# Seconds to wait for one lookup attempt to produce a response
+# Seconds to wait for one lookup attempt to produce a response.
+# Keep timeout and attempts at least as high as the runners': they set the request timeout.
 timeout = 20
 # Attempts per browser before giving up on a lookup (>= 1)
 attempts = 1
@@ -44,19 +51,11 @@ cache_ttl = 10800
 # Beyond this estimated queue wait (seconds), return 429
 max_queue_wait = 30
 
-# One table per browser. Omit all to run a single browser named "default".
-# `name` determines the profile dir name.
-[[browsers]]
-name = "default"
-# Omit `proxy` to connect directly. username / password are optional.
-# proxy = { server = "socks5://127.0.0.1:1080", username = { env = "PROXY_USER" }, password = { env = "PROXY_PASS" } }
-# Optional. Retries after a captcha prefer another group.
-# group = "provider-a"
-
 [usage]
 # SQLite file recording tenant usage.
-# Default: platform user data dir, e.g. on macOS:
+# Defaults to the platform user data dir.
 # db_path = "~/Library/Application Support/eoir-api/usage.sqlite"
+
 # Days to keep lookup records
 retention_days = 180
 

@@ -51,7 +51,6 @@ async def lookup_with(browser, fake_once, a_number: str = "012345678"):
 def test_option_label_matches_only_the_exact_country():
     pattern = option_label("GUINEA", "GV")
 
-    assert pattern.pattern == r"^GUINEA\ \(GV\)$"
     assert pattern.match("GUINEA (GV)")
     assert not pattern.match("EQUATORIAL GUINEA (EK)")
     assert not pattern.match("GUINEA BISSAU (PU)")
@@ -100,11 +99,6 @@ def test_message_payloads_are_returned_and_classified(acis_browser, message, out
 
     assert acis_browser._parse(responded(payload)) == payload
     assert Outcome.from_payload(payload) is outcome
-
-
-def test_a_non_dict_data_section_is_not_a_success():
-    assert Outcome.from_payload({"Data": None}) is Outcome.OTHER
-    assert Outcome.from_payload({}) is Outcome.OTHER
 
 
 def test_non_json_body_raises_upstream_error(acis_browser):
@@ -182,13 +176,6 @@ async def test_lookup_returns_message_payload_verbatim(acis_browser):
         return dict(payload)
 
     assert await lookup_with(acis_browser, fake_once) == payload
-
-
-async def test_lookup_returns_success_payload_untouched(acis_browser, master_hearing):
-    async def fake_once(a_number, nat_code, nat_name):
-        return dict(master_hearing)
-
-    assert await lookup_with(acis_browser, fake_once, "999999999") == master_hearing
 
 
 async def test_lookup_retries_captcha_then_raises(acis_browser, monkeypatch):

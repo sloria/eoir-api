@@ -1,9 +1,9 @@
 """Automated browser to perform ACIS lookups."""
 
 from acis_core.exceptions import AcisError
-from acis_core.outcome import Outcome
+from acis_core.outcome import Outcome, raise_for_outcome
 
-from acis_browser.browser import AcisBrowser, raise_for_outcome
+from acis_browser.browser import AcisBrowser
 from acis_browser.exceptions import (
     BrowserLostError,
     CaptchaError,

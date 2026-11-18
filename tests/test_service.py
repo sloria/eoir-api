@@ -4,16 +4,18 @@ import datetime as dt
 
 import anyio
 import anyio.lowlevel
+import httpx2
 import pytest
-from acis_browser import CaptchaError
+from acis_core.exceptions import BrowserLostError, CaptchaError
 from acis_core.nationalities import resolve
 
 from eoir_api.exceptions import BrowserUnavailableError, QueueTimeoutError
+from eoir_api.remote import RemoteBrowser
 from eoir_api.service import CaseService
-from eoir_api.settings import Browser, Proxy, Secret, Tenant
+from eoir_api.settings import Browser, Secret, Tenant
 from eoir_api.usage import TenantUsage
 
-from .conftest import FakeAcisBrowser
+from .conftest import FakeAcisBrowser, mock_runner
 
 pytestmark = pytest.mark.anyio
 
@@ -363,10 +365,9 @@ async def test_lookup_gives_up_after_max_browsers_fail_captcha(
     assert service.retry_after == 0
 
 
-def configure_browsers(settings, **browsers: tuple[str, str | None]) -> None:
+def configure_browsers(settings, **groups: str) -> None:
     settings.browsers = [
-        Browser(name=name, proxy=Proxy(server=server), group=group)
-        for name, (server, group) in browsers.items()
+        Browser(name=name, runner="mac", group=group) for name, group in groups.items()
     ]
 
 
@@ -375,9 +376,9 @@ async def test_retry_prefers_a_browser_in_another_group(
 ):
     configure_browsers(
         settings,
-        a=("socks5://host-a:1081", "provider-a"),
-        b=("socks5://host-b:1081", "provider-a"),
-        c=("socks5://host-c:1081", "provider-b"),
+        a="provider-a",
+        b="provider-a",
+        c="provider-b",
     )
     a, b, c = (FakeAcisBrowser(payload=master_hearing) for _ in "abc")
     service = CaseService({"a": a, "b": b, "c": c}, settings, clock=clock)
@@ -392,11 +393,11 @@ async def test_retry_prefers_the_group_challenged_longest_ago(
 ):
     configure_browsers(
         settings,
-        a=("socks5://host-a:1081", "provider-a"),
-        b=("socks5://host-b:1081", "provider-b"),
-        d=("socks5://host-d:1081", "provider-c"),
-        c=("socks5://host-c:1081", "provider-b"),
-        e=("socks5://host-e:1081", "provider-d"),
+        a="provider-a",
+        b="provider-b",
+        d="provider-c",
+        c="provider-b",
+        e="provider-d",
     )
     a, b, c, d, e = (FakeAcisBrowser(payload=master_hearing) for _ in "abcde")
     service = CaseService(  # ties break on dict order: d before c
@@ -417,11 +418,130 @@ async def test_retry_falls_back_to_the_same_group(
 ):
     configure_browsers(
         settings,
-        a=("socks5://host-a:1081", "provider-a"),
-        b=("socks5://host-b:1081", "provider-a"),
+        a="provider-a",
+        b="provider-a",
     )
     a, b = (FakeAcisBrowser(payload=master_hearing) for _ in "ab")
     service = CaseService({"a": a, "b": b}, settings, clock=clock)
     a.error = CAPTCHA
     await service.get_case(A_NUMBER, VE, usage=usage)
     assert len(b.calls) == 1
+
+
+##### Runners #####
+
+
+LOST = BrowserLostError("Runner one unreachable")
+
+
+def runner_service(settings, clock, master_hearing, **browsers: str):
+    settings.browsers = [Browser(name=b, runner=r) for b, r in browsers.items()]
+    fakes = {name: FakeAcisBrowser(payload=master_hearing) for name in browsers}
+    return CaseService(fakes, settings, clock=clock), fakes
+
+
+async def test_lost_browser_retries_on_another_browser(
+    usage, settings, clock, master_hearing
+):
+    service, fakes = runner_service(settings, clock, master_hearing, a="one", b="two")
+    fakes["a"].error = LOST
+    result = await service.get_case(A_NUMBER, VE, usage=usage)
+    assert result.cached is False
+    assert len(fakes["b"].calls) == 1
+
+
+async def test_lost_runner_without_alternative_raises_browser_lost(
+    usage, settings, clock, master_hearing
+):
+    service, fakes = runner_service(settings, clock, master_hearing, a="one")
+    fakes["a"].error = LOST
+    with pytest.raises(BrowserLostError):
+        await service.get_case(A_NUMBER, VE, usage=usage)
+
+
+async def test_runner_failover_counts_against_max_browsers(
+    usage, settings, clock, master_hearing
+):
+    settings.lookup.max_browsers = 1
+    service, fakes = runner_service(settings, clock, master_hearing, a="one", b="two")
+    fakes["a"].error = LOST
+    with pytest.raises(BrowserLostError):
+        await service.get_case(A_NUMBER, VE, usage=usage)
+    assert len(fakes["b"].calls) == 0
+
+
+class FakeRunner:
+    def __init__(self, payload) -> None:
+        self.payload = payload
+        self.healthy = True
+        self.reachable = True
+        self.lookups = 0
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        if not self.reachable:
+            raise httpx2.ConnectError("connection refused", request=request)
+        if request.url.path == "/healthz":
+            return httpx2.Response(200 if self.healthy else 503)
+        self.lookups += 1
+        return httpx2.Response(200, json=self.payload)
+
+
+@pytest.fixture
+def fake_runner(master_hearing) -> FakeRunner:
+    return FakeRunner(master_hearing)
+
+
+def remote_service(settings, clock, fake_runner, master_hearing):
+    settings.browsers = [
+        Browser(name="a", runner="one"),
+        Browser(name="b", runner="two"),
+    ]
+    remote = RemoteBrowser(mock_runner(fake_runner, "one"), "a")
+    other = FakeAcisBrowser(payload=master_hearing)
+    return CaseService({"a": remote, "b": other}, settings, clock=clock), remote, other
+
+
+async def test_unhealthy_runner_is_skipped_until_it_answers_again(
+    usage, settings, clock, fake_runner, master_hearing
+):
+    service, remote, other = remote_service(
+        settings, clock, fake_runner, master_hearing
+    )
+
+    fake_runner.healthy = False
+    await remote.runner.check_health()
+    for i in range(2):
+        await service.get_case(f"10000000{i}", VE, usage=usage)
+    assert (fake_runner.lookups, len(other.calls)) == (0, 2)
+
+    fake_runner.healthy = True
+    await remote.runner.check_health()
+    await service.get_case("100000002", VE, usage=usage)
+    assert fake_runner.lookups == 1
+
+
+async def test_unreachable_runner_is_skipped_before_its_next_health_check(
+    usage, settings, clock, fake_runner, master_hearing
+):
+    service, remote, other = remote_service(
+        settings, clock, fake_runner, master_hearing
+    )
+    fake_runner.reachable = False
+    await service.get_case(A_NUMBER, VE, usage=usage)  # fails over to b
+    assert len(other.calls) == 1
+    assert not remote.is_available
+
+    clock.now += 60
+    await service.get_case("100000001", VE, usage=usage)
+    assert len(other.calls) == 2
+
+
+async def test_all_runners_down_raises_unavailable(usage, settings, clock, fake_runner):
+    settings.browsers = [Browser(name="a", runner="one")]
+    remote = RemoteBrowser(mock_runner(fake_runner, "one"), "a")
+    service = CaseService({"a": remote}, settings, clock=clock)
+    fake_runner.healthy = False
+    await remote.runner.check_health()
+    with pytest.raises(BrowserUnavailableError):
+        await service.get_case(A_NUMBER, VE, usage=usage)
+    assert fake_runner.lookups == 0
