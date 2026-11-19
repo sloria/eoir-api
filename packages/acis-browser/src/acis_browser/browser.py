@@ -118,7 +118,6 @@ class AcisBrowser:
     lookup_timeout: float = 20
     lookup_attempts: int = 1
     proxy: ProxySettings | None = None
-    # Keep a pre-filled form ready between lookups and rewrite its case request
     intercept: bool = False
 
     last_used: float = field(default=0.0, init=False)
