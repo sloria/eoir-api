@@ -61,6 +61,8 @@ class Lookup(_Base):
     """Seconds to cache a successful lookup result."""
     max_queue_wait: int = 30
     """Beyond this, return 429 instead of holding the connection."""
+    intercept: bool = False
+    """Submit a form pre-filled between lookups, rewriting its case request."""
 
 
 class Usage(_Base):

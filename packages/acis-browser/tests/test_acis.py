@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -18,7 +19,12 @@ from acis_browser import (
     UpstreamError,
     raise_for_outcome,
 )
-from acis_browser.browser import _Capture, option_label, purge_site_storage
+from acis_browser._intercept import PLACEHOLDER
+from acis_browser.browser import (
+    Capture,
+    option_label,
+    purge_site_storage,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -27,8 +33,8 @@ _UNSET = object()
 
 def responded(
     payload: Any = _UNSET, *, status: int = 200, body: str | None = None
-) -> _Capture:
-    capture = _Capture(
+) -> Capture:
+    capture = Capture(
         requested=True,
         status=status,
         body=json.dumps(payload) if payload is not _UNSET else body,
@@ -37,13 +43,13 @@ def responded(
     return capture
 
 
-async def fake_start() -> None:
+async def noop(*args):
     pass
 
 
 async def lookup_with(browser, fake_once, a_number: str = "012345678"):
     """Run ``lookup`` against a stubbed ``_lookup_once``."""
-    browser.start = fake_start
+    browser.start = noop
     browser._lookup_once = fake_once
     return await browser.lookup(a_number, "MX", "MEXICO")
 
@@ -62,13 +68,13 @@ def test_option_label_matches_only_the_exact_country():
 
 def test_no_request_means_no_token_was_minted(acis_browser):
     with pytest.raises(CaptchaError) as excinfo:
-        acis_browser._parse(_Capture(requested=False))
+        acis_browser._parse(Capture(requested=False))
     assert excinfo.value.reason is CaptchaError.Reason.NO_REQUEST
 
 
 def test_request_without_a_response_is_a_timeout_not_a_mint_failure(acis_browser):
     with pytest.raises(CaptchaError) as excinfo:
-        acis_browser._parse(_Capture(requested=True))
+        acis_browser._parse(Capture(requested=True))
     assert excinfo.value.reason is CaptchaError.Reason.NO_RESPONSE
     assert str(acis_browser.lookup_timeout) in str(excinfo.value)
 
@@ -198,10 +204,7 @@ async def test_lookup_retries_captcha_then_raises(acis_browser, monkeypatch):
         calls.append(a_number)
         raise CaptchaError("rejected", reason=CaptchaError.Reason.REJECTED)
 
-    async def no_sleep(seconds):
-        pass
-
-    monkeypatch.setattr("acis_browser.browser.asyncio.sleep", no_sleep)
+    monkeypatch.setattr("acis_browser.browser.asyncio.sleep", noop)
     acis_browser.lookup_attempts = 2
 
     with pytest.raises(CaptchaError):
@@ -275,7 +278,7 @@ async def test_browser_closing_mid_page_load_is_browser_lost(acis_browser):
     async def fake_close() -> None:
         pass
 
-    acis_browser.start = fake_start
+    acis_browser.start = noop
     acis_browser._context = Context()
     acis_browser._close = fake_close
 
@@ -358,6 +361,207 @@ async def test_close_waits_for_an_in_flight_lookup(acis_browser):
     finish.set()
     await asyncio.gather(lookup, close)
     assert events == ["lookup", "close"]
+
+
+##### Interception #####
+
+CASE_URL = (
+    "https://eoir-ws.eoir.justice.gov/api/Case/GetCaseInfo"
+    "?alienNumber={}&languageCode=EN&natCode={}"
+)
+CASE = ("987654321", "GT")
+NOT_FOUND = {"message": "No case info found for A-Number"}
+
+
+class FakeRoute:
+    def __init__(self, url):
+        self.request = SimpleNamespace(url=url)
+        self.sent = None
+
+    async def continue_(self, url):
+        self.sent = url
+
+    async def abort(self):
+        pass
+
+
+class FakeResponse:
+    status = 200
+
+    def __init__(self, url, payload):
+        self.url = url
+        self.payload = payload
+
+    async def text(self):
+        return json.dumps(self.payload)
+
+
+class FakePage:
+    def __init__(self, context):
+        self.context = context
+        self.closed = False
+        self.form = ("", "")
+        self.listeners = {}
+        self.rewrite = None
+        self.sent = []
+
+    def on(self, event, handler):
+        self.listeners[event] = handler
+
+    def is_closed(self):
+        return self.closed
+
+    def locator(self, selector):
+        return self
+
+    async def route(self, pattern, handler):
+        self.rewrite = handler
+
+    async def wait_for_selector(self, *args, **kwargs):
+        await asyncio.Event().wait()
+
+    async def click(self):
+        url = CASE_URL.format(*self.form)
+        await self.listeners["request"](SimpleNamespace(url=url))
+        if self.rewrite:
+            route = FakeRoute(url)
+            await self.rewrite(route)
+            url = route.sent
+        if url:
+            self.sent.append(url)
+            payload = NOT_FOUND if PLACEHOLDER[0] in url else self.context.payload
+            await self.listeners["response"](FakeResponse(url, payload))
+
+    async def close(self):
+        self.closed = True
+
+
+class FakeContext:
+    def __init__(self, payload):
+        self.payload = payload
+        self.pages = []
+
+    async def new_page(self):
+        self.pages.append(FakePage(self))
+        return self.pages[-1]
+
+    async def close(self):
+        pass
+
+
+@pytest.fixture
+def warm_browser(acis_browser, master_hearing):
+    async def fill_form(page, a_number, nat_code, nat_name):
+        page.form = (a_number, nat_code)
+
+    async def modal_accepted(context):
+        return True
+
+    acis_browser.intercept = True
+    acis_browser.start = noop
+    acis_browser._context = FakeContext(master_hearing)
+    acis_browser._open_form = noop
+    acis_browser._fill_form = fill_form
+    acis_browser._wait_for_captcha = noop
+    acis_browser._clear_site_storage = noop
+    acis_browser._modal_was_accepted = modal_accepted
+    return acis_browser
+
+
+async def warm_page(browser):
+    await browser._warm_task
+    return browser._context.pages[-1]
+
+
+async def lookup_case(browser):
+    return await browser.lookup(*CASE, "GUATEMALA")
+
+
+async def test_lookup_after_a_lookup_submits_the_warm_form_for_the_real_case(
+    warm_browser, master_hearing
+):
+    await lookup_case(warm_browser)
+    page = await warm_page(warm_browser)
+    assert page.form == PLACEHOLDER[:2]
+
+    assert await lookup_case(warm_browser) == master_hearing
+    assert page.sent == [CASE_URL.format(*CASE)]
+    assert page.closed
+
+
+async def test_warm_page_request_that_was_not_rewritten_is_never_returned(warm_browser):
+    await lookup_case(warm_browser)
+    (await warm_page(warm_browser)).rewrite = None
+
+    with pytest.raises(UpstreamError):
+        await lookup_case(warm_browser)
+
+
+async def test_a_number_the_form_would_not_accept_is_not_sent_through_a_warm_page(
+    warm_browser,
+):
+    await lookup_case(warm_browser)
+    page = await warm_page(warm_browser)
+
+    await warm_browser.lookup("A-987654321", "GT", "GUATEMALA")
+
+    assert not page.sent
+
+
+async def test_stale_warm_page_is_discarded_for_a_cold_load(warm_browser, monkeypatch):
+    await lookup_case(warm_browser)
+    page = await warm_page(warm_browser)
+    monkeypatch.setattr("acis_browser.browser.WARM_MAX_AGE", 0)
+
+    await lookup_case(warm_browser)
+
+    assert page.closed
+    assert not page.sent
+    assert warm_browser._context.pages[2].sent == [CASE_URL.format(*CASE)]
+
+
+async def test_failed_lookup_does_not_warm(warm_browser):
+    warm_browser._context.payload = {"message": "Invalid Captcha Provided"}
+
+    with pytest.raises(CaptchaError):
+        await lookup_case(warm_browser)
+    await asyncio.sleep(0)
+
+    assert len(warm_browser._context.pages) == 1
+
+
+async def test_failed_warm_falls_back_to_a_cold_load(warm_browser, master_hearing):
+    pages = warm_browser._context.pages
+
+    async def flaky_open_form(page):
+        if len(pages) == 2:
+            raise PlaywrightError("net::ERR_CONNECTION_RESET")
+
+    warm_browser._open_form = flaky_open_form
+    await lookup_case(warm_browser)
+    await warm_browser._warm_task
+
+    assert await lookup_case(warm_browser) == master_hearing
+    assert pages[1].closed
+    assert pages[2].sent == [CASE_URL.format(*CASE)]
+
+
+async def test_close_mid_warm_closes_the_warm_page(warm_browser):
+    started = asyncio.Event()
+    pages = warm_browser._context.pages
+
+    async def hanging_open_form(page):
+        if len(pages) == 2:
+            started.set()
+            await asyncio.Event().wait()
+
+    warm_browser._open_form = hanging_open_form
+    await lookup_case(warm_browser)
+    await started.wait()
+
+    await warm_browser.close()
+
+    assert pages[1].closed
 
 
 def test_purging_site_storage_keeps_cookies(tmp_path):

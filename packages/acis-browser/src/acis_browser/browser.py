@@ -18,6 +18,13 @@ from patchright.async_api import Error as PlaywrightError
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 from patchright.async_api import async_playwright
 
+from acis_browser._intercept import (
+    PLACEHOLDER,
+    WARM_MAX_AGE,
+    CaseQuery,
+    WarmPage,
+    case_of,
+)
 from acis_browser.exceptions import (
     BrowserLostError,
     CaptchaError,
@@ -46,6 +53,8 @@ ACIS_ORIGIN = "https://acis.eoir.justice.gov"
 ACIS_URL = f"{ACIS_ORIGIN}/en/"
 HCAPTCHA_IFRAME = 'iframe[src*="hcaptcha.com"]'
 CHALLENGE_IFRAME = f'{HCAPTCHA_IFRAME}[src*="frame=challenge"]'
+CASE_INFO_PATH = "/api/Case/GetCaseInfo"
+CASE_INFO_URL = re.compile(rf"{re.escape(CASE_INFO_PATH)}\?")
 
 BROWSER_LOST_ERRORS = (PlaywrightError, RuntimeError)
 
@@ -92,10 +101,11 @@ def raise_for_outcome(payload: dict[str, Any]) -> None:
 
 
 @dataclass
-class _Capture:
+class Capture:
     requested: bool = False
     challenged: bool = False
     status: int = 0
+    url: str = ""
     body: str | None = None
     received: asyncio.Event = field(default_factory=asyncio.Event)
 
@@ -108,12 +118,17 @@ class AcisBrowser:
     lookup_timeout: float = 20
     lookup_attempts: int = 1
     proxy: ProxySettings | None = None
+    # Keep a pre-filled form ready between lookups and rewrite its case request
+    intercept: bool = False
 
     last_used: float = field(default=0.0, init=False)
     # Lock to ensure only one lookup or close at a time
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _playwright: Playwright | None = field(default=None, init=False, repr=False)
     _context: BrowserContext | None = field(default=None, init=False, repr=False)
+    _warm_task: asyncio.Task[WarmPage | None] | None = field(
+        default=None, init=False, repr=False
+    )
 
     ##### Lifecycle #####
 
@@ -148,6 +163,10 @@ class AcisBrowser:
             await self._close()
 
     async def _close(self) -> None:
+        if self._warm_task is not None:
+            self._warm_task.cancel()
+            await asyncio.gather(self._warm_task, return_exceptions=True)
+            self._warm_task = None
         if self._context is not None:
             logger.info("browser stopping")
             try:
@@ -213,54 +232,103 @@ class AcisBrowser:
                             await self._close()
                         raise BrowserLostError("Chrome is no longer available") from exc
                     else:
+                        if self.intercept and self._warm_task is None:
+                            self._warm_task = asyncio.create_task(self._warm())
                         return payload
             finally:
                 self.last_used = time.monotonic()
 
+    async def _warm(self) -> WarmPage | None:
+        """Open a new page with the form filled with the placeholder."""
+        if self._context is None:  # pragma: no cover
+            return None
+        try:
+            warm = WarmPage(await self._context.new_page())
+            try:
+                await self._open_form(warm.page)
+                await self._fill_form(warm.page, *PLACEHOLDER)
+                await warm.install_route(CASE_INFO_URL)
+                await self._wait_for_captcha(warm.page)
+            except BaseException:
+                await self._close_page(warm.page)
+                raise
+        except Exception as exc:  # noqa: BLE001 Not BaseException because CancelledError shouldn't be swallowed
+            logger.warning("lookup.warm_failed", error=str(exc))
+            return None
+        warm.ready_at = time.monotonic()
+        return warm
+
+    async def _take_warm_page(
+        self, case: CaseQuery, capture: Capture
+    ) -> WarmPage | None:
+        """Return the warm page set to send the case if fresh, else discard it."""
+        if not re.fullmatch(r"\d{9}", case.a_number):
+            return None
+        task, self._warm_task = self._warm_task, None
+        try:
+            warm = await asyncio.wait_for(task, self.lookup_timeout) if task else None
+        except TimeoutError:
+            logger.warning("lookup.warm_timeout")
+            return None
+        if warm is None:
+            return None
+        is_fresh = False
+        try:
+            is_fresh = (
+                time.monotonic() - warm.ready_at < WARM_MAX_AGE
+                and not warm.page.is_closed()
+                # Warm page was loaded with the modal accepted; it may have expired
+                and await self._modal_was_accepted(warm.page.context)
+            )
+            if is_fresh:
+                warm.case, warm.capture = case, capture
+                return warm
+            logger.info("lookup.warm_page_stale")
+        except BROWSER_LOST_ERRORS as exc:
+            logger.warning("lookup.warm_failed", error=str(exc))
+        finally:
+            if not is_fresh:
+                await self._close_page(warm.page)
+        return None
+
     async def _lookup_once(
         self, a_number: str, nat_code: str, nat_name: str
     ) -> dict[str, Any]:
-        """Fill the form and return the parsed backend response."""
+        """Fill the form, or submit a warm one, and return the parsed response."""
         if self._context is None:  # pragma: no cover
             raise BrowserLostError("Browser is not running")
-        page = await self._context.new_page()
-        captured = _Capture()
-        case_info_path = "/api/Case/GetCaseInfo"
+        case = CaseQuery(a_number, nat_code.upper())
+        capture = Capture()
+        warm = await self._take_warm_page(case, capture)
+        logger.debug("lookup.page", warm=warm is not None)
+        page = warm.page if warm else await self._context.new_page()
 
         async def on_request(request: Request) -> None:
-            if case_info_path in request.url:
-                captured.requested = True
+            if CASE_INFO_PATH in request.url:
+                capture.requested = True
 
         async def on_response(response: Response) -> None:
-            if case_info_path not in response.url:
+            if CASE_INFO_PATH not in response.url:
                 return
-            captured.status = response.status
+            capture.status = response.status
+            capture.url = response.url
             try:
-                captured.body = await response.text()
+                capture.body = await response.text()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("could not read ACIS response body", error=str(exc))
             finally:
-                captured.received.set()
+                capture.received.set()
 
         page.on("request", on_request)
         page.on("response", on_response)
 
         try:
-            await page.goto(ACIS_URL, wait_until="domcontentloaded", timeout=60_000)
-            app_hydrated = await self._wait_for(
-                page,
-                "html[data-react-helmet]",
-                "app to hydrate",
-                state="attached",
-                timeout_ms=30_000,
-            )
-            if not app_hydrated:
-                raise UpstreamError("ACIS did not finish loading")
-            await self._dismiss_modal(page)
-            await self._fill_form(page, a_number, nat_code, nat_name)
-            await self._wait_for_captcha(page)
+            if warm is None:
+                await self._open_form(page)
+                await self._fill_form(page, a_number, nat_code, nat_name)
+                await self._wait_for_captcha(page)
             await page.locator("#btn_submit").click()
-            await self._wait_for_response(page, captured)
+            await self._wait_for_response(page, capture)
         except TargetClosedError:
             raise
         except PlaywrightError as exc:
@@ -270,12 +338,30 @@ class AcisBrowser:
                 await self._clear_site_storage(page)
             except BROWSER_LOST_ERRORS as exc:
                 logger.warning("could not clear site storage", error=str(exc))
-            try:
-                await page.close()
-            except BROWSER_LOST_ERRORS:
-                logger.warning("could not close page")
+            await self._close_page(page)
 
-        return self._parse(captured)
+        if warm and capture.received.is_set() and case_of(capture.url) != case:
+            raise UpstreamError("Case request was not rewritten")
+        return self._parse(capture)
+
+    async def _close_page(self, page: Page) -> None:
+        try:
+            await page.close()
+        except BROWSER_LOST_ERRORS:
+            logger.warning("could not close page")
+
+    async def _open_form(self, page: Page) -> None:
+        await page.goto(ACIS_URL, wait_until="domcontentloaded", timeout=60_000)
+        app_hydrated = await self._wait_for(
+            page,
+            "html[data-react-helmet]",
+            "app to hydrate",
+            state="attached",
+            timeout_ms=30_000,
+        )
+        if not app_hydrated:
+            raise UpstreamError("ACIS did not finish loading")
+        await self._dismiss_modal(page)
 
     async def _clear_site_storage(self, page: Page) -> None:
         # Unload the app first, or it could write after the clear
@@ -292,7 +378,7 @@ class AcisBrowser:
             },
         )
 
-    async def _wait_for_response(self, page: Page, captured: _Capture) -> None:
+    async def _wait_for_response(self, page: Page, capture: Capture) -> None:
         """Wait for the case response, giving up early on a visible challenge."""
 
         async def watch_challenge() -> None:
@@ -303,14 +389,14 @@ class AcisBrowser:
                 state="attached",
                 timeout_ms=0,
             )
-            if captured.requested:
-                await captured.received.wait()
+            if capture.requested:
+                await capture.received.wait()
             else:
-                captured.challenged = True
+                capture.challenged = True
 
         tasks = {
             asyncio.create_task(watch_challenge()),
-            asyncio.create_task(captured.received.wait()),
+            asyncio.create_task(capture.received.wait()),
         }
         try:
             done, _ = await asyncio.wait(
@@ -341,17 +427,19 @@ class AcisBrowser:
 
     async def _dismiss_modal(self, page: Page) -> None:
         overlay = ".ReactModal__Overlay"
-        # Set on accept, expires after 30 min; the modal shows only without it
-        cookies = await page.context.cookies(ACIS_URL)
-        accepted = any(
-            c["name"] == "disclaimer" and c["value"] == "true" for c in cookies
-        )
-        if accepted and not await page.locator(overlay).count():
+        if (
+            await self._modal_was_accepted(page.context)
+            and not await page.locator(overlay).count()
+        ):
             return
         if not await self._wait_for(page, overlay, "consent modal", timeout_ms=500):
             return
         await page.locator(".ReactModalPortal button").last.click()
         await self._wait_for(page, overlay, "consent modal to close", state="detached")
+
+    async def _modal_was_accepted(self, context: BrowserContext) -> bool:
+        cookies = await context.cookies(ACIS_URL)
+        return any(c["name"] == "disclaimer" and c["value"] == "true" for c in cookies)
 
     async def _wait_for_captcha(self, page: Page) -> None:
         if not await self._wait_for(
@@ -382,14 +470,14 @@ class AcisBrowser:
             page, '[role="option"]', "nationality menu to close", state="detached"
         )
 
-    def _parse(self, captured: _Capture) -> dict[str, Any]:
-        if not captured.received.is_set():
-            if captured.challenged:
+    def _parse(self, capture: Capture) -> dict[str, Any]:
+        if not capture.received.is_set():
+            if capture.challenged:
                 raise CaptchaError(
                     "No captcha token obtained: hCaptcha showed a visible challenge",
                     reason=CaptchaError.Reason.CHALLENGE,
                 )
-            if not captured.requested:
+            if not capture.requested:
                 raise CaptchaError(
                     "No captcha token obtained: the form was submitted but no case "
                     "request followed",
@@ -399,11 +487,11 @@ class AcisBrowser:
                 f"No response to the case request within {self.lookup_timeout}s",
                 reason=CaptchaError.Reason.NO_RESPONSE,
             )
-        if captured.body is None:
+        if capture.body is None:
             raise UpstreamError(
-                f"Could not read ACIS response body (HTTP {captured.status})"
+                f"Could not read ACIS response body (HTTP {capture.status})"
             )
-        status, body = captured.status, captured.body
+        status, body = capture.status, capture.body
         try:
             payload = json.loads(body)
         except json.JSONDecodeError as exc:
