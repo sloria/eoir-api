@@ -41,28 +41,18 @@ class Server(_Base):
 
 class Chrome(_Base):
     profiles_dir: Path = user_data_path("eoir-api") / "profiles"
-    """Parent of one persistent Chrome profile per browser."""
     idle_timeout: int = 900
-    """Seconds of inactivity before a browser is torn down."""
 
 
 class Lookup(_Base):
     interval: int = 30
-    """Minimum seconds between lookups on one browser."""
     timeout: int = 20
-    """Seconds to wait for a single lookup attempt to produce a response."""
     attempts: Annotated[int, msgspec.Meta(ge=1)] = 1
-    """Attempts per browser before giving up on a lookup."""
     max_browsers: Annotated[int, msgspec.Meta(ge=1)] = 2
-    """Browsers one request tries before giving up on captcha failures."""
     captcha_cooldown: int = 300
-    """Seconds a browser pauses after a captcha failure."""
     cache_ttl: int = 3 * 60 * 60
-    """Seconds to cache a successful lookup result."""
     max_queue_wait: int = 30
-    """Beyond this, return 429 instead of holding the connection."""
     intercept: bool = False
-    """Submit a form pre-filled between lookups, rewriting its case request."""
 
 
 class Usage(_Base):
@@ -108,11 +98,8 @@ class Browser(_Base):
 class Tenant(_Base):
     name: SafeName
     key: Secret
-    """Value the tenant sends in the ``x-api-key`` header."""
     quota_per_day: Annotated[int, msgspec.Meta(ge=1)] | None = None
-    """Lookups allowed per rolling 24h. Unset means unlimited."""
     max_concurrency: Annotated[int, msgspec.Meta(ge=1)] | None = None
-    """Concurrent lookups allowed before 429. Unset means no cap."""
 
     def __post_init__(self) -> None:
         if len(self.key) < MIN_KEY_LENGTH:
