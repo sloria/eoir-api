@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.8.2](https://github.com/sloria/eoir-api/compare/acis-browser-v3.8.1...acis-browser-v3.8.2) (2026-11-19)
+
+
+### Performance Improvements
+
+* pre-warm pages and intercept case requests (experimental, opt in) ([527f99f](https://github.com/sloria/eoir-api/commit/527f99f5b5cf9321d913f6880c2bd3fef2e0e65e))
+* skip modal wait when possible ([#104](https://github.com/sloria/eoir-api/issues/104)) ([124eff8](https://github.com/sloria/eoir-api/commit/124eff8e0aa0667f55fe3b25d7a8e4b9b5dc9b2b))
+
 ## [3.8.1](https://github.com/sloria/eoir-api/compare/acis-browser-v3.8.0...acis-browser-v3.8.1) (2026-11-15)
 
 
