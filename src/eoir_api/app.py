@@ -253,6 +253,7 @@ def create_app(settings: Settings) -> Litestar:
             proxy=proxy_settings(b.proxy),
             lookup_timeout=settings.lookup.timeout,
             lookup_attempts=settings.lookup.attempts,
+            intercept=settings.lookup.intercept,
         )
         for b in settings.browsers
     }
