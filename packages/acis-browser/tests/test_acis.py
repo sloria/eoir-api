@@ -508,10 +508,16 @@ async def test_a_number_the_form_would_not_accept_is_not_sent_through_a_warm_pag
     assert not page.sent
 
 
-async def test_stale_warm_page_is_discarded_for_a_cold_load(warm_browser, monkeypatch):
+async def test_warm_page_with_an_expired_disclaimer_is_discarded_for_a_cold_load(
+    warm_browser,
+):
     await lookup_case(warm_browser)
     page = await warm_page(warm_browser)
-    monkeypatch.setattr("acis_browser.browser.WARM_MAX_AGE", 0)
+
+    async def modal_expired(context):
+        return False
+
+    warm_browser._modal_was_accepted = modal_expired
 
     await lookup_case(warm_browser)
 
