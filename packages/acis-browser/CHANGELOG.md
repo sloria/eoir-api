@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.3](https://github.com/sloria/eoir-api/compare/acis-browser-v3.8.2...acis-browser-v3.8.3) (2026-11-20)
+
+
+### Performance Improvements
+
+* remove unnecessary warm page cap ([#107](https://github.com/sloria/eoir-api/issues/107)) ([83070a6](https://github.com/sloria/eoir-api/commit/83070a6c9e3572e55d56219e573ba8a38d4d2f85))
+
 ## [3.8.2](https://github.com/sloria/eoir-api/compare/acis-browser-v3.8.1...acis-browser-v3.8.2) (2026-11-19)
 
 
