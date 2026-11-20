@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlencode, urlsplit
@@ -19,7 +20,6 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 PLACEHOLDER = ("123456789", "MX", "MEXICO")
-WARM_MAX_AGE = 240
 
 
 @dataclass(frozen=True)
@@ -52,6 +52,10 @@ class WarmPage:
     ready_at: float = 0.0
     case: CaseQuery | None = None
     capture: Capture | None = None
+
+    @property
+    def age(self) -> float:
+        return round(time.monotonic() - self.ready_at, 1)
 
     async def install_route(self, url: re.Pattern[str]) -> None:
         await self.page.route(url, self._on_case_request)

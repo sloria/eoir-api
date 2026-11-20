@@ -20,7 +20,6 @@ from patchright.async_api import async_playwright
 
 from acis_browser._intercept import (
     PLACEHOLDER,
-    WARM_MAX_AGE,
     CaseQuery,
     WarmPage,
     case_of,
@@ -260,7 +259,7 @@ class AcisBrowser:
     async def _take_warm_page(
         self, case: CaseQuery, capture: Capture
     ) -> WarmPage | None:
-        """Return the warm page set to send the case if fresh, else discard it."""
+        """Return the warm page set to send the case if still valid, else discard it."""
         if not re.fullmatch(r"\d{9}", case.a_number):
             return None
         task, self._warm_task = self._warm_task, None
@@ -274,15 +273,14 @@ class AcisBrowser:
         is_fresh = False
         try:
             is_fresh = (
-                time.monotonic() - warm.ready_at < WARM_MAX_AGE
-                and not warm.page.is_closed()
+                not warm.page.is_closed()
                 # Warm page was loaded with the modal accepted; it may have expired
                 and await self._modal_was_accepted(warm.page.context)
             )
             if is_fresh:
                 warm.case, warm.capture = case, capture
                 return warm
-            logger.info("lookup.warm_page_stale")
+            logger.info("lookup.warm_page_stale", age=warm.age)
         except BROWSER_LOST_ERRORS as exc:
             logger.warning("lookup.warm_failed", error=str(exc))
         finally:
@@ -299,7 +297,9 @@ class AcisBrowser:
         case = CaseQuery(a_number, nat_code.upper())
         capture = Capture()
         warm = await self._take_warm_page(case, capture)
-        logger.debug("lookup.page", warm=warm is not None)
+        logger.debug(
+            "lookup.page", warm=warm is not None, age=warm.age if warm else None
+        )
         page = warm.page if warm else await self._context.new_page()
 
         async def on_request(request: Request) -> None:
