@@ -5,6 +5,7 @@
   "packages": {
     ".": {
       "component": "eoir-api",
+      "exclude-paths": ["packages"],
       "extra-files": [
         {
           "type": "toml",
