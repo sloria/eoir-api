@@ -8,7 +8,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Mapping  # noqa: TC003
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Any, Protocol, cast
 
 import anyio
 import msgspec
@@ -22,6 +22,7 @@ from acis_browser import (
     raise_for_outcome,
 )
 from acis_core.nationalities import Nationality
+from acis_core.payload import ACISPayload
 
 from eoir_api.exceptions import (
     BrowserUnavailableError,
@@ -94,7 +95,7 @@ class Case(msgspec.Struct):
         bool,
         msgspec.Meta(description="Whether the case was returned from the cache."),
     ]
-    acis: Annotated[dict[str, Any], msgspec.Meta(description="The raw ACIS response.")]
+    acis: Annotated[ACISPayload, msgspec.Meta(description="The raw ACIS response.")]
 
 
 @dataclass
@@ -113,7 +114,7 @@ class CaseService:
         # Not a dataclass field: msgspec resolves field annotations when Litestar
         # builds the signature model, and it cannot evaluate TTLCache's PEP 695 type
         # parameter.
-        self._cache: TTLCache[dict[str, Any]] = TTLCache(
+        self._cache: TTLCache[ACISPayload] = TTLCache(
             ttl=self.settings.lookup.cache_ttl
         )
         groups = {b.name: b.group for b in self.settings.browsers}
@@ -319,7 +320,7 @@ class CaseService:
                 duration_ms=round((self.clock() - started) * 1000),
             )
 
-        entry = self._cache.set(key, payload)
+        entry = self._cache.set(key, cast("ACISPayload", payload))
         logger.info(
             "lookup.success",
             browser=slot.name,
@@ -332,5 +333,5 @@ class CaseService:
             nationality=nationality,
             retrieved_at=entry.stored_at,
             cached=False,
-            acis=payload,
+            acis=entry.value,
         )

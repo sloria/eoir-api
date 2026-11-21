@@ -35,6 +35,15 @@ async def test_schema_documents_lookup_body(client):
     assert set(schema["required"]) == {"a_number", "nationality"}
 
 
+async def test_schema_documents_acis_payload(client):
+    schemas = (await client.get("/schema/openapi.json")).json()["components"]["schemas"]
+    assert {"Data", "Proceeding", "Schedule"} <= set(
+        schemas["ACISPayload"]["properties"]
+    )
+    assert schemas["ACISSchedule"]["properties"]["AdjTime"]["description"]
+    assert schemas["ACISAppeal"]["properties"]["FiledDate"]["description"]
+
+
 async def test_schema_excludes_portal(client):
     paths = (await client.get("/schema/openapi.json")).json()["paths"]
     assert not any(p.startswith("/portal") for p in paths)
