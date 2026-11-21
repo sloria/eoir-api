@@ -4,6 +4,8 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any, Literal, TypeAlias
 
+from acis_core.payload import ACISPayload
+
 HearingType: TypeAlias = Literal["master", "individual"]
 HearingMedium: TypeAlias = Literal["internet", "in_person"]
 
@@ -192,7 +194,7 @@ _OTHER_COMP: dict[str, DecisionOutcome] = {
 _FEAR_REVIEW_TYPES = frozenset({"CFR", "RFR"})
 
 
-def decision_outcome(payload: dict[str, Any]) -> DecisionOutcome | None:
+def decision_outcome(payload: ACISPayload) -> DecisionOutcome | None:
     """Map a payload's decision codes to an outcome, or None if unmapped."""
     data = payload.get("Data") or {}
     proceeding = payload.get("Proceeding") or {}
@@ -337,7 +339,7 @@ class Appeal:
     bia_decision_date: dt.date | None = None
 
 
-def _parse_hearing(payload: dict[str, Any]) -> Hearing | None:
+def _parse_hearing(payload: ACISPayload) -> Hearing | None:
     schedule = payload.get("Schedule") or {}
     date = parse_date(schedule.get("AdjDate"))
     if date is None:
@@ -362,7 +364,7 @@ class Case:
     motion_at_bia: Motion | None = None
 
     @classmethod
-    def from_payload(cls, payload: dict[str, Any]) -> Case:
+    def from_payload(cls, payload: ACISPayload) -> Case:
         return cls(
             name=(payload.get("Data") or {}).get("AlienName"),
             hearing=_parse_hearing(payload),
@@ -376,7 +378,7 @@ class Case:
 ##### Parser functions #####
 
 
-def _parse_decision(payload: dict[str, Any]) -> Decision | None:
+def _parse_decision(payload: ACISPayload) -> Decision | None:
     proceeding = payload.get("Proceeding") or {}
     date = parse_date(proceeding.get("CompDate"))
     if date is None:
@@ -389,7 +391,7 @@ def _parse_decision(payload: dict[str, Any]) -> Decision | None:
     )
 
 
-def _parse_motion_to_reopen(payload: dict[str, Any]) -> Motion | None:
+def _parse_motion_to_reopen(payload: ACISPayload) -> Motion | None:
     data = payload.get("Data") or {}
     if not data.get("ReopenExists"):
         return None
@@ -403,7 +405,7 @@ def _parse_motion_to_reopen(payload: dict[str, Any]) -> Motion | None:
     )
 
 
-def _parse_motion_at_bia(payload: dict[str, Any]) -> Motion | None:
+def _parse_motion_at_bia(payload: ACISPayload) -> Motion | None:
     data = payload.get("Data") or {}
     if not data.get("MTR_BIA_Appeal"):
         return None
@@ -417,7 +419,7 @@ def _parse_motion_at_bia(payload: dict[str, Any]) -> Motion | None:
     return Motion(outcome=outcome, type=mtype, filed=filed, decided=decided)
 
 
-def _parse_appeal(payload: dict[str, Any]) -> Appeal:
+def _parse_appeal(payload: ACISPayload) -> Appeal:
     data = payload.get("Data") or {}
     proceeding = payload.get("Proceeding") or {}
     appeal_data = payload.get("Appeal") or {}
