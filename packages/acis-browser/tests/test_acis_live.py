@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import os
+from typing import get_type_hints
 
 import pytest
 from acis_core.nationalities import resolve
+from acis_core.payload import ACISPayload
 
 from acis_browser import AcisBrowser, Outcome
 
@@ -78,3 +80,11 @@ async def test_payload_shape_is_unchanged(live_browser):
         assert section in payload, f"payload is missing the {section!r} section"
         missing = [key for key in keys if key not in payload[section]]
         assert not missing, f"{section} is missing {missing}"
+
+    sections = get_type_hints(ACISPayload)
+    undocumented = set(payload) - set(sections)
+    for name in sections.keys() & payload.keys():
+        if isinstance(payload[name], dict):
+            fields = get_type_hints(sections[name])
+            undocumented |= {f"{name}.{key}" for key in payload[name].keys() - fields}
+    assert not undocumented, f"ACISPayload is missing {sorted(undocumented)}"
