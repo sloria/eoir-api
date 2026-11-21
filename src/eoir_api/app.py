@@ -40,6 +40,7 @@ from sqlspec.extensions.litestar import SQLSpecPlugin
 
 from eoir_api.auth import SESSION_MAX_AGE, TenantAuthMiddleware
 from eoir_api.exceptions import BrowserUnavailableError
+from eoir_api.lib.openapi import DescribedTypedDictPlugin
 from eoir_api.portal import PortalController, register_filters
 from eoir_api.request_id import RequestIdMiddleware
 from eoir_api.routes import ROUTE_HANDLERS
@@ -346,7 +347,7 @@ def build_app(
             TenantAuthMiddleware(settings.tenants),
         ],
         csrf_config=csrf,
-        plugins=[SQLSpecPlugin(sqlspec=spec), *plugins],
+        plugins=[SQLSpecPlugin(sqlspec=spec), DescribedTypedDictPlugin(), *plugins],
         lifespan=[
             make_usage_lifespan(usage_service, usage_config),
             *lifespan,
