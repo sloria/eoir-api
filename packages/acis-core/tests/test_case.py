@@ -5,6 +5,7 @@ import datetime as dt
 import pytest
 
 from acis_core import case
+from acis_core.payload import ACISPayload
 
 
 def payload(
@@ -322,7 +323,7 @@ def test_no_decision_while_a_case_is_pending(master_hearing):
 
 
 def test_decision_requires_a_completion_date():
-    live = {
+    live: ACISPayload = {
         "Data": {"OSC_Date": "2023-01-05T00:00:00"},
         # A DecisionCode alone is not a decision; ACIS ignores it without CompDate.
         "Proceeding": {"DecisionCode": "X", "CaseType": "RMV", "CompDate": None},
@@ -371,7 +372,7 @@ def test_no_motion_when_none_exists(master_hearing):
 
 
 def test_undecided_motion_is_pending():
-    pending = {
+    pending: ACISPayload = {
         "Data": {"ReopenExists": True},
         "Reopen": {
             "CompDate": None,
@@ -386,7 +387,7 @@ def test_undecided_motion_is_pending():
 
 
 def test_motion_at_bia_uses_the_motion_bucketing():
-    payload_at_bia = {
+    payload_at_bia: ACISPayload = {
         "Data": {"MTR_BIA_Appeal": True, "MTR_BIA_Type": "REC"},
         "MTR": {
             "MTRDecision": "GRN",
@@ -411,7 +412,7 @@ def test_appeal_from_a_removal_case(removal_ordered):
 
 
 def test_appeal_brief_due_is_separate_from_the_filing_deadline():
-    payload = {
+    payload: ACISPayload = {
         "Proceeding": {"DateAppealDue": "2026-08-07T00:00:00"},
         "Appeal": {"AlienBriefDue": "2026-09-15T00:00:00"},
     }
