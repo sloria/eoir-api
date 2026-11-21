@@ -130,7 +130,7 @@ def make_usage_lifespan(
 
 
 API_DESCRIPTION = """\
-Look up cases in EOIR's [Automated Case Information System (ACIS)](https://acis.eoir.justice.gov/).
+An unofficial API for EOIR's [Automated Case Information System (ACIS)](https://acis.eoir.justice.gov/).
 
 Authenticate by sending your API key in the `x-api-key` header.
 
