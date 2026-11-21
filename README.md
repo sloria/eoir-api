@@ -91,8 +91,24 @@ EOIR_TEST_A_NUMBER=... EOIR_TEST_NATIONALITY=... mise run test:live
 
 Must run on a host machine with Google Chrome (cannot use headless).
 
+Clone this repo and install depedencies.
+
 ```bash
-uv run --frozen --no-dev eoir-api serve --config /path/to/config.toml
+git clone https://github.com/sloria/eoir-api.git
+uv run patchright install chrome
+uv sync --no-dev
+```
+
+Copy the config template and edit the values.
+
+```bash
+cp config.example.toml config.toml
+```
+
+Run the server.
+
+```bash
+uv run  eoir-api serve --config config.toml
 ```
 
 ## License

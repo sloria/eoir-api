@@ -3,6 +3,16 @@
   "release-type": "python",
   "separate-pull-requests": true,
   "packages": {
+    ".": {
+      "component": "eoir-api",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='eoir-api')].version"
+        }
+      ]
+    },
     "packages/acis-browser": {
       "component": "acis-browser",
       "extra-files": [

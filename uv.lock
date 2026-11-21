@@ -217,7 +217,7 @@ wheels = [
 
 [[package]]
 name = "eoir-api"
-version = "26.0.0"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "acis-browser" },
