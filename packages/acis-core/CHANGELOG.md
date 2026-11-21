@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/sloria/eoir-api/compare/acis-core-v1.2.2...acis-core-v1.3.0) (2026-11-21)
+
+
+### Features
+
+* add ACISPayload TypedDicts for documentation of upstream ([131c475](https://github.com/sloria/eoir-api/commit/131c475bc6ab1b678a60ff0968cd0aac58de22af))
+
 ## [1.2.2](https://github.com/sloria/eoir-api/compare/acis-core-v1.2.1...acis-core-v1.2.2) (2026-11-13)
 
 
