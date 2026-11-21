@@ -8,7 +8,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Mapping  # noqa: TC003
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Annotated, Any, Protocol
 
 import anyio
 import msgspec
@@ -74,11 +74,27 @@ def outcome_of(exc: Exception) -> LookupOutcome:
 
 
 class Case(msgspec.Struct):
-    a_number: str
-    nationality: Nationality
-    retrieved_at: dt.datetime
-    cached: bool
-    acis: dict[str, Any]
+    a_number: Annotated[
+        str, msgspec.Meta(description="The A-Number of the retrieved case.")
+    ]
+    nationality: Annotated[
+        Nationality,
+        msgspec.Meta(description="The nationality of the retrieved case."),
+    ]
+    retrieved_at: Annotated[
+        dt.datetime,
+        msgspec.Meta(
+            description=(
+                "When the case was retrieved from ACIS. Earlier than the "
+                "request time if the case was returned from cache."
+            )
+        ),
+    ]
+    cached: Annotated[
+        bool,
+        msgspec.Meta(description="Whether the case was returned from the cache."),
+    ]
+    acis: Annotated[dict[str, Any], msgspec.Meta(description="The raw ACIS response.")]
 
 
 @dataclass

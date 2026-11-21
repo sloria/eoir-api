@@ -55,7 +55,9 @@ class BadGatewayException(HTTPException):
 
 
 class CaseLookup(msgspec.Struct, forbid_unknown_fields=True):
-    a_number: str
+    a_number: Annotated[
+        str, msgspec.Meta(description='A-Number. Leading "A" and dashes are ignored.')
+    ]
     nationality: Annotated[
         str,
         msgspec.Meta(
@@ -67,9 +69,19 @@ class CaseLookup(msgspec.Struct, forbid_unknown_fields=True):
     ] = False
 
 
-class TooManyRequests(msgspec.Struct):
+class ErrorResponse(msgspec.Struct):
     status_code: int
     detail: str
+
+
+class BadRequest(ErrorResponse):
+    extra: Annotated[
+        list[dict[str, Any]] | None,
+        msgspec.Meta(description="Validation errors, when the body is malformed."),
+    ] = None
+
+
+class TooManyRequests(ErrorResponse):
     code: Annotated[
         Literal["quota_exceeded"] | None,
         msgspec.Meta(description="Set when the daily quota is used up."),
@@ -84,6 +96,29 @@ def flatten_extra(_: Request, exc: TooManyRequestsException) -> Response:
         status_code=exc.status_code,
         headers=exc.headers,
     )
+
+
+def error_spec(model: type[ErrorResponse], description: str) -> ResponseSpec:
+    return ResponseSpec(model, description=description, generate_examples=False)
+
+
+ERROR_RESPONSES = {
+    400: error_spec(
+        BadRequest, "Invalid A-Number, unknown nationality, or malformed body"
+    ),
+    401: error_spec(ErrorResponse, "Invalid or missing `x-api-key` header"),
+    404: error_spec(ErrorResponse, "No case found for that A-Number and nationality"),
+    422: error_spec(
+        ErrorResponse, "The case exists but ACIS won't release information for it"
+    ),
+    429: error_spec(
+        TooManyRequests, "Too many pending lookups or daily quota exceeded"
+    ),
+    502: error_spec(ErrorResponse, "ACIS returned an unexpected response"),
+    503: error_spec(
+        ErrorResponse, "Lookups temporarily unavailable. Retry after `Retry-After`."
+    ),
+}
 
 
 ##### Route handlers #####
@@ -125,19 +160,9 @@ def health() -> Response:
 @post(
     "/cases/lookup",
     status_code=HTTP_200_OK,
-    raises=[
-        NotFoundException,
-        UnprocessableContentException,
-        BadGatewayException,
-        ServiceUnavailableException,
-    ],
-    responses={
-        429: ResponseSpec(
-            TooManyRequests,
-            description="Too many pending lookups or daily quota exceeded",
-            generate_examples=False,
-        ),
-    },
+    responses=ERROR_RESPONSES,
+    summary="Look up a case",
+    response_description="The case, with the raw ACIS payload",
     exception_handlers={TooManyRequestsException: flatten_extra},
 )
 async def lookup_case(
@@ -146,7 +171,7 @@ async def lookup_case(
     service: NamedDependency[CaseService],
     usage: NamedDependency[TenantUsage],
 ) -> Response[Case]:
-    """Look up current case information for an A-Number and nationality."""
+    """Look up case information for an A-Number and nationality."""
     try:
         case = await fetch_case(service, usage, data)
     except HTTPException as exc:
