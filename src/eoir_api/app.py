@@ -12,7 +12,7 @@ import anyio
 import msgspec
 import sentry_sdk
 import structlog
-from acis_browser import AcisBrowser, CaptchaError
+from acis_browser import ACISBrowser, CaptchaError
 from litestar import Litestar, Request
 from litestar.config.csrf import CSRFConfig
 from litestar.datastructures import State
@@ -64,11 +64,11 @@ SCHEMA_ASSETS_PATH = "/schema/assets"
 
 
 def make_browser_lifespan(
-    browsers: Mapping[str, AcisBrowser], idle_timeout: float
+    browsers: Mapping[str, ACISBrowser], idle_timeout: float
 ) -> Callable[[Litestar], Any]:
     check_interval = 60
 
-    async def close_browser(name: str, browser: AcisBrowser) -> None:
+    async def close_browser(name: str, browser: ACISBrowser) -> None:
         try:
             await browser.close()
         except Exception:
@@ -249,7 +249,7 @@ def create_app(settings: Settings) -> Litestar:
     )
 
     browsers = {
-        b.name: AcisBrowser(
+        b.name: ACISBrowser(
             profile_dir=settings.chrome.profiles_dir / b.name,
             proxy=proxy_settings(b.proxy),
             lookup_timeout=settings.lookup.timeout,

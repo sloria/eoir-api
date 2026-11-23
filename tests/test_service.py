@@ -13,7 +13,7 @@ from eoir_api.service import CaseService
 from eoir_api.settings import Browser, Proxy, Secret, Tenant
 from eoir_api.usage import TenantUsage
 
-from .conftest import FakeAcisBrowser
+from .conftest import FakeACISBrowser
 
 pytestmark = pytest.mark.anyio
 
@@ -190,8 +190,8 @@ CAPTCHA = CaptchaError("boom", reason=CaptchaError.Reason.REJECTED)
 @pytest.fixture
 def browsers(master_hearing):
     return {
-        "a": FakeAcisBrowser(payload=master_hearing),
-        "b": FakeAcisBrowser(payload=master_hearing),
+        "a": FakeACISBrowser(payload=master_hearing),
+        "b": FakeACISBrowser(payload=master_hearing),
     }
 
 
@@ -354,7 +354,7 @@ async def test_lookup_waiting_on_a_lock_skips_a_browser_that_entered_cooldown(
 async def test_lookup_gives_up_after_max_browsers_fail_captcha(
     usage, master_hearing, settings, clock, reason
 ):
-    a, b, c = (FakeAcisBrowser(payload=master_hearing) for _ in "abc")
+    a, b, c = (FakeACISBrowser(payload=master_hearing) for _ in "abc")
     service = CaseService({"a": a, "b": b, "c": c}, settings, clock=clock)
     a.error = b.error = c.error = CaptchaError("boom", reason=reason)
     with pytest.raises(CaptchaError):
@@ -379,7 +379,7 @@ async def test_retry_prefers_a_browser_in_another_group(
         b=("socks5://host-b:1081", "provider-a"),
         c=("socks5://host-c:1081", "provider-b"),
     )
-    a, b, c = (FakeAcisBrowser(payload=master_hearing) for _ in "abc")
+    a, b, c = (FakeACISBrowser(payload=master_hearing) for _ in "abc")
     service = CaseService({"a": a, "b": b, "c": c}, settings, clock=clock)
     a.error = CAPTCHA
     await service.get_case(A_NUMBER, VE, usage=usage)
@@ -398,7 +398,7 @@ async def test_retry_prefers_the_group_challenged_longest_ago(
         c=("socks5://host-c:1081", "provider-b"),
         e=("socks5://host-e:1081", "provider-d"),
     )
-    a, b, c, d, e = (FakeAcisBrowser(payload=master_hearing) for _ in "abcde")
+    a, b, c, d, e = (FakeACISBrowser(payload=master_hearing) for _ in "abcde")
     service = CaseService(  # ties break on dict order: d before c
         {"a": a, "b": b, "d": d, "c": c, "e": e}, settings, clock=clock
     )
@@ -420,7 +420,7 @@ async def test_retry_falls_back_to_the_same_group(
         a=("socks5://host-a:1081", "provider-a"),
         b=("socks5://host-b:1081", "provider-a"),
     )
-    a, b = (FakeAcisBrowser(payload=master_hearing) for _ in "ab")
+    a, b = (FakeACISBrowser(payload=master_hearing) for _ in "ab")
     service = CaseService({"a": a, "b": b}, settings, clock=clock)
     a.error = CAPTCHA
     await service.get_case(A_NUMBER, VE, usage=usage)

@@ -62,7 +62,7 @@ def master_hearing() -> dict[str, Any]:
     return load_fixture("master_hearing_scheduled.json")
 
 
-class FakeAcisBrowser:
+class FakeACISBrowser:
     def __init__(self, payload: dict[str, Any] | None = None) -> None:
         self.payload = payload
         self.error: Exception | None = None
@@ -95,8 +95,8 @@ def settings(tmp_path) -> Settings:
 
 
 @pytest.fixture
-def browser(master_hearing) -> FakeAcisBrowser:
-    return FakeAcisBrowser(payload=master_hearing)
+def browser(master_hearing) -> FakeACISBrowser:
+    return FakeACISBrowser(payload=master_hearing)
 
 
 @dataclass
