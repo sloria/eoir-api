@@ -36,7 +36,6 @@
     },
     "packages/eoir-api-client": {
       "component": "eoir-api-client",
-      "release-as": "1.0.0",
       "extra-files": [
         {
           "type": "toml",
