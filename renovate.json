@@ -5,10 +5,20 @@
     "group:allNonMajor",
     ":enablePreCommit"
   ],
+  "lockFileMaintenance": {
+    "semanticCommitType": "deps",
+    "semanticCommitScope": null
+  },
   "packageRules": [
     {
       "matchDatasources": ["pypi"],
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "matchFileNames": ["pyproject.toml"],
+      "matchDepTypes": ["project.dependencies"],
+      "semanticCommitType": "deps",
+      "semanticCommitScope": null
     },
     {
       "matchPackageNames": ["patchright"],
