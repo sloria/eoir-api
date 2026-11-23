@@ -297,9 +297,8 @@ class AcisBrowser:
         case = CaseQuery(a_number, nat_code.upper())
         capture = Capture()
         warm = await self._take_warm_page(case, capture)
-        logger.debug(
-            "lookup.page", warm=warm is not None, age=warm.age if warm else None
-        )
+        structlog.contextvars.bind_contextvars(is_warm=warm is not None)
+        logger.debug("lookup.page", age=warm.age if warm else None)
         page = warm.page if warm else await self._context.new_page()
 
         async def on_request(request: Request) -> None:
