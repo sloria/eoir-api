@@ -1,4 +1,4 @@
-"""Service class for looking up cases. Composes the browser, the cache, and queue mgmt."""
+"""Service class for looking up cases. Composes browser load balancing, the cache, and queue mgmt."""
 
 from __future__ import annotations
 

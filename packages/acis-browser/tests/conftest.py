@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from acis_browser import AcisBrowser
+from acis_browser import ACISBrowser
 
 pytestmark = pytest.mark.anyio
 
@@ -27,5 +27,5 @@ def master_hearing() -> dict[str, Any]:
 
 
 @pytest.fixture
-def acis_browser(tmp_path) -> AcisBrowser:
-    return AcisBrowser(profile_dir=tmp_path / "profile")
+def acis_browser(tmp_path) -> ACISBrowser:
+    return ACISBrowser(profile_dir=tmp_path / "profile")
