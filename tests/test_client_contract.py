@@ -108,4 +108,4 @@ async def test_upstream_error(make_client, browser):
     browser.error = UpstreamError("ACIS returned HTTP 500")
 
     with pytest.raises(ServerError):
-        await make_client(max_attempts=1).lookup(A_NUMBER, "VE")
+        await make_client().lookup(A_NUMBER, "VE")

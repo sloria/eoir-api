@@ -7,7 +7,7 @@ authors = [{ name = "Steven Loria", email = "git@stevenloria.com" }]
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-dependencies = ["acis-core>=1,<2", "anyio>=4.10", "httpx2>=2.7.0"]
+dependencies = ["acis-core>=1,<2", "httpx2>=2.7.0"]
 
 [project.urls]
 Homepage = "https://github.com/sloria/eoir-api"

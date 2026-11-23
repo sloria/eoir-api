@@ -271,14 +271,12 @@ version = "0.0.0"
 source = { editable = "packages/eoir-api-client" }
 dependencies = [
     { name = "acis-core" },
-    { name = "anyio" },
     { name = "httpx2" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "acis-core", editable = "packages/acis-core" },
-    { name = "anyio", specifier = ">=4.10" },
     { name = "httpx2", specifier = ">=2.7.0" },
 ]
 

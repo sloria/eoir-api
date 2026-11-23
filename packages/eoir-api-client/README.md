@@ -13,9 +13,8 @@ with eoir_api_client.Client("https://eoir-api.example.com", "my-api-key") as cli
     except eoir_api_client.RetryLaterError as error:
         ...  # try again in error.retry_after seconds
     else:
-        result.case  # acis_core.case.Case
+        result.case  # acis_core.case.Case object
         result.acis  # raw ACIS payload
-        result.cached, result.retrieved_at, result.quota
 ```
 
 `eoir_api_client.AsyncClient` has the same interface (`await client.lookup(...)`)

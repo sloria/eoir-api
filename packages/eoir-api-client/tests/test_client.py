@@ -48,18 +48,6 @@ def error(status_code: int, **kwargs) -> httpx2.Response:
     return httpx2.Response(status_code, json={"detail": "nope"}, **kwargs)
 
 
-@pytest.fixture(autouse=True)
-def sleeps(monkeypatch) -> list[float]:
-    slept: list[float] = []
-
-    async def async_sleep(seconds: float) -> None:
-        slept.append(seconds)
-
-    monkeypatch.setattr("eoir_api_client.client.time.sleep", slept.append)
-    monkeypatch.setattr("eoir_api_client.client.anyio.sleep", async_sleep)
-    return slept
-
-
 @pytest.fixture(
     params=[(Client, httpx2.Client), (AsyncClient, httpx2.AsyncClient)],
     ids=["sync", "async"],
@@ -146,11 +134,10 @@ async def test_result_carries_quota_and_request_id(make_lookup):
         (401, AuthenticationError),
         (404, CaseNotFoundError),
         (422, CaseUnavailableError),
+        (502, ServerError),
     ],
 )
-async def test_final_errors_raise_without_retrying(
-    make_lookup, sleeps, status_code, expected
-):
+async def test_error_mapping(make_lookup, status_code, expected):
     handler = sequence(error(status_code, headers=QUOTA_HEADERS))
 
     with pytest.raises(expected) as excinfo:
@@ -159,11 +146,11 @@ async def test_final_errors_raise_without_retrying(
     assert excinfo.value.status_code == status_code
     assert excinfo.value.detail == "nope"
     assert excinfo.value.quota == QUOTA
-    assert sleeps == []
+    assert len(handler.requests) == 1
 
 
 @pytest.mark.parametrize("status_code", [429, 503])
-async def test_retry_later_raises_without_waiting(make_lookup, sleeps, status_code):
+async def test_retry_later(make_lookup, status_code):
     handler = sequence(error(status_code, headers={"Retry-After": "12"}))
 
     with pytest.raises(RetryLaterError) as excinfo:
@@ -172,7 +159,7 @@ async def test_retry_later_raises_without_waiting(make_lookup, sleeps, status_co
     assert not isinstance(excinfo.value, QuotaExceededError)
     assert excinfo.value.retry_after == 12
     assert excinfo.value.status_code == status_code
-    assert sleeps == []
+    assert len(handler.requests) == 1
 
 
 async def test_quota_exceeded(make_lookup):
@@ -189,32 +176,9 @@ async def test_quota_exceeded(make_lookup):
     assert excinfo.value.quota == QUOTA
 
 
-async def test_gives_up_on_server_errors_after_max_attempts(make_lookup, sleeps):
-    handler = sequence(error(502), error(500), error(502))
-
-    with pytest.raises(ServerError):
-        await make_lookup(handler)("999999999", "VE")
-
-    assert len(handler.requests) == 3
-    assert sleeps == [1, 2]
-
-
-async def test_gives_up_on_network_errors_after_max_attempts(make_lookup):
-    handler = sequence(*(httpx2.ConnectError("boom") for _ in range(3)))
-
+async def test_network_error(make_lookup):
     with pytest.raises(NetworkError) as excinfo:
-        await make_lookup(handler)("999999999", "VE")
+        await make_lookup(sequence(httpx2.ConnectError("boom")))("999999999", "VE")
 
     assert isinstance(excinfo.value.__cause__, httpx2.ConnectError)
     assert excinfo.value.status_code is None
-
-
-async def test_on_retry_sees_each_retried_error_and_wait(make_lookup):
-    seen = []
-    handler = sequence(error(502), httpx2.ConnectError("boom"), ok())
-
-    await make_lookup(handler)(
-        "999999999", "VE", on_retry=lambda err, delay: seen.append((type(err), delay))
-    )
-
-    assert seen == [(ServerError, 1), (NetworkError, 2)]
