@@ -40,9 +40,10 @@ def parse_response(response: httpx2.Response) -> LookupResult:
     status_code = response.status_code
     if status_code == 200:
         data = response.json()
+        nationality = data["nationality"]
         return LookupResult(
             a_number=data["a_number"],
-            nationality=Nationality(**data["nationality"]),
+            nationality=Nationality(code=nationality["code"], name=nationality["name"]),
             retrieved_at=dt.datetime.fromisoformat(data["retrieved_at"]),
             cached=data["cached"],
             acis=data["acis"],
