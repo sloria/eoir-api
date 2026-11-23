@@ -419,6 +419,18 @@ def test_appeal_brief_due_is_separate_from_the_filing_deadline():
     appeal = case.Case.from_payload(payload).appeal
     assert appeal.due == dt.date(2026, 8, 7)
     assert appeal.brief_due == dt.date(2026, 9, 15)
+    assert appeal.brief_filed is None
+
+
+def test_appeal_brief_filed():
+    payload: ACISPayload = {
+        "Appeal": {
+            "AlienBriefDue": "2026-09-15T00:00:00",
+            "AlienBriefFiled": "2026-09-10T00:00:00",
+        },
+    }
+    appeal = case.Case.from_payload(payload).appeal
+    assert appeal.brief_filed == dt.date(2026, 9, 10)
 
 
 ##### Case #####

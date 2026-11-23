@@ -333,6 +333,7 @@ class Appeal:
     filed_date: dt.date | None = None
     due: dt.date | None = None
     brief_due: dt.date | None = None
+    brief_filed: dt.date | None = None
     type: AppealType | None = None
     pending_at_bia: bool = False
     bia_outcome: BiaOutcome | None = None
@@ -428,6 +429,7 @@ def _parse_appeal(payload: ACISPayload) -> Appeal:
         filed_date=parse_date(appeal_data.get("FiledDate")),
         due=parse_date(proceeding.get("DateAppealDue")),
         brief_due=parse_date(appeal_data.get("AlienBriefDue")),
+        brief_filed=parse_date(appeal_data.get("AlienBriefFiled")),
         type=appeal_type(appeal_data.get("AppealType")),
         pending_at_bia=bool(data.get("PendingAtBIA")),
         bia_outcome=bia_outcome(appeal_data.get("BIADecision")),
