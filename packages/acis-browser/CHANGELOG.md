@@ -8,10 +8,6 @@
 * rename AcisBrowser/AcisError to ACISBrowser/ACISError ([0a992f1](https://github.com/sloria/eoir-api/commit/0a992f15b76b7bb9329846644d0f001a3f2d8d83))
 
 
-### Documentation
-
-* **api:** document ACISPayload in the API ([e16d6aa](https://github.com/sloria/eoir-api/commit/e16d6aa720ebdd62a5ad2cf12c8dede7ae08c165))
-
 ## [3.8.3](https://github.com/sloria/eoir-api/compare/acis-browser-v3.8.2...acis-browser-v3.8.3) (2026-11-20)
 
 
