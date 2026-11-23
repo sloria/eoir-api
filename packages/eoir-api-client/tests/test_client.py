@@ -172,7 +172,7 @@ async def test_quota_exceeded(make_lookup):
     with pytest.raises(QuotaExceededError) as excinfo:
         await make_lookup(sequence(response))("999999999", "VE")
 
-    assert excinfo.value.retry_after == 7200
+    assert not isinstance(excinfo.value, RetryLaterError)
     assert excinfo.value.quota == QUOTA
 
 

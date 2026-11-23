@@ -99,9 +99,8 @@ async def test_quota_exceeded(make_client):
     with pytest.raises(QuotaExceededError) as excinfo:
         await client.lookup(A_NUMBER, "VE", refresh=True)
 
-    assert excinfo.value.retry_after > 0
-    assert excinfo.value.quota is not None
     assert excinfo.value.quota.remaining == 0
+    assert excinfo.value.quota.reset_at > NOW
 
 
 async def test_upstream_error(make_client, browser):

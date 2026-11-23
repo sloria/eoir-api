@@ -52,9 +52,10 @@ def parse_response(response: httpx2.Response) -> LookupResult:
 
     body = _error_body(response)
     extra: dict[str, Any] = {}
-    if status_code in {429, 503}:
-        quota_exceeded = body.get("code") == "quota_exceeded"
-        error_class = QuotaExceededError if quota_exceeded else RetryLaterError
+    if body.get("code") == "quota_exceeded":
+        error_class = QuotaExceededError if quota else APIError
+    elif status_code in {429, 503}:
+        error_class = RetryLaterError
         extra["retry_after"] = _retry_after(response.headers)
     elif status_code >= 500:
         error_class = ServerError

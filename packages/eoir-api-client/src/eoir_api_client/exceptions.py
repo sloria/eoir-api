@@ -41,7 +41,7 @@ class CaseUnavailableError(APIError):
 
 
 class RetryLaterError(APIError):
-    """Lookups are temporarily unavailable; retry after ``retry_after`` seconds.
+    """Lookups are temporarily unavailable. Wait for ``retry_after`` seconds before retrying.
 
     ``status_code`` is 429 when too many lookups are pending and 503 when
     lookups are paused, e.g. after a captcha.
@@ -52,8 +52,10 @@ class RetryLaterError(APIError):
         self.retry_after = retry_after
 
 
-class QuotaExceededError(RetryLaterError):
-    """The daily quota is used up."""
+class QuotaExceededError(APIError):
+    """The daily quota is used up. A lookup frees up at ``quota.reset_at``."""
+
+    quota: Quota
 
 
 class ServerError(APIError):
