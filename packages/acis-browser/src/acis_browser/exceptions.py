@@ -3,10 +3,10 @@ from __future__ import annotations
 from enum import StrEnum, auto
 from typing import Any
 
-from acis_core.exceptions import AcisError
+from acis_core.exceptions import ACISError
 
 
-class CaptchaError(AcisError):
+class CaptchaError(ACISError):
     """Raised when an hCaptcha token can't be obtained or the token is refused."""
 
     class Reason(StrEnum):
@@ -26,19 +26,19 @@ class CaptchaError(AcisError):
         self.reason = reason
 
 
-class CaseNotFoundError(AcisError):
+class CaseNotFoundError(ACISError):
     """Raised when ACIS has no case for a given A-Number."""
 
 
-class InvalidNationalityError(AcisError):
+class InvalidNationalityError(ACISError):
     """Raised when ACIS rejects the nationality code."""
 
 
-class CaseUnavailableError(AcisError):
+class CaseUnavailableError(ACISError):
     """Raised when the case exists but ACIS won't release information for it."""
 
 
-class UpstreamError(AcisError):
+class UpstreamError(ACISError):
     """Raised when ACIS returns an unexpected response."""
 
 

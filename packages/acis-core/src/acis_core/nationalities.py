@@ -7,13 +7,13 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
-from acis_core.exceptions import AcisError
+from acis_core.exceptions import ACISError
 
 HERE = Path(__file__).parent
 REFERENCE_FILE = HERE / "reference" / "nationality-codes.json"
 
 
-class UnknownNationalityError(AcisError):
+class UnknownNationalityError(ACISError):
     """Raised when a nationality code or name can't be resolved."""
 
 

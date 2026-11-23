@@ -9,6 +9,7 @@ import pytest
 from patchright._impl._errors import TargetClosedError
 from patchright.async_api import Error as PlaywrightError
 
+import acis_browser as acis_browser_module
 from acis_browser import (
     BrowserLostError,
     CaptchaError,
@@ -585,3 +586,11 @@ def test_purging_site_storage_keeps_cookies(tmp_path):
     purge_site_storage(tmp_path)
 
     assert [p.name for p in default.iterdir()] == ["Cookies"]
+
+
+@pytest.mark.parametrize(
+    ("old", "new"), [("AcisBrowser", "ACISBrowser"), ("AcisError", "ACISError")]
+)
+def test_deprecated_names_warn_and_resolve_to_new_names(old, new):
+    with pytest.warns(DeprecationWarning, match=new):
+        assert getattr(acis_browser_module, old) is getattr(acis_browser_module, new)

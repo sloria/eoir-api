@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import re
 
-from acis_core.exceptions import AcisError
+from acis_core.exceptions import ACISError
 
 
-class InvalidANumberError(AcisError):
+class InvalidANumberError(ACISError):
     """Raised when an A-Number isn't valid."""
 
 

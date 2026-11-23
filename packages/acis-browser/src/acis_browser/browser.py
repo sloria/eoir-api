@@ -110,7 +110,7 @@ class Capture:
 
 
 @dataclass(kw_only=True)
-class AcisBrowser:
+class ACISBrowser:
     """A Playwright/Patchright wrapper to do ACIS lookups."""
 
     profile_dir: Path

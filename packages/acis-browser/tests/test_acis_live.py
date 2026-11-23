@@ -9,7 +9,7 @@ import pytest
 from acis_core.nationalities import resolve
 from acis_core.payload import ACISPayload
 
-from acis_browser import AcisBrowser, Outcome
+from acis_browser import ACISBrowser, Outcome
 
 pytestmark = [pytest.mark.anyio, pytest.mark.live]
 
@@ -51,8 +51,8 @@ REQUIRED_KEYS = {
 
 
 @pytest.fixture
-def live_browser(tmp_path) -> AcisBrowser:
-    return AcisBrowser(profile_dir=tmp_path / "profile")
+def live_browser(tmp_path) -> ACISBrowser:
+    return ACISBrowser(profile_dir=tmp_path / "profile")
 
 
 async def test_captcha_token_is_accepted(live_browser):
