@@ -1,6 +1,6 @@
 [project]
 name = "eoir-api-client"
-version = "0.0.0"
+version = "1.0.0"
 description = "Sync and async clients for eoir-api."
 readme = "README.md"
 authors = [{ name = "Steven Loria", email = "git@stevenloria.com" }]

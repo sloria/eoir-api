@@ -267,7 +267,7 @@ dev = [
 
 [[package]]
 name = "eoir-api-client"
-version = "0.0.0"
+version = "1.0.0"
 source = { editable = "packages/eoir-api-client" }
 dependencies = [
     { name = "acis-core" },
