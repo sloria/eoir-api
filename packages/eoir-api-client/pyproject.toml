@@ -1,0 +1,25 @@
+[project]
+name = "eoir-api-client"
+version = "0.0.0"
+description = "Sync and async clients for eoir-api."
+readme = "README.md"
+authors = [{ name = "Steven Loria", email = "git@stevenloria.com" }]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = ["acis-core>=1.2,<2", "httpx2>=2.7.0"]
+
+[project.urls]
+Homepage = "https://github.com/sloria/eoir-api"
+Source = "https://github.com/sloria/eoir-api"
+Issues = "https://github.com/sloria/eoir-api/issues"
+
+[build-system]
+requires = ["flit_core<5"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+name = "eoir_api_client"
+
+[tool.ruff]
+extend = "../../pyproject.toml"

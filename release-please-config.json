@@ -33,6 +33,17 @@
           "jsonpath": "$.package[?(@.name.value=='acis-core')].version"
         }
       ]
+    },
+    "packages/eoir-api-client": {
+      "component": "eoir-api-client",
+      "release-as": "1.0.0",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='eoir-api-client')].version"
+        }
+      ]
     }
   }
 }
