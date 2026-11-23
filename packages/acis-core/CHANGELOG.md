@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/sloria/eoir-api/compare/acis-core-v1.4.0...acis-core-v1.5.0) (2026-11-23)
+
+
+### Features
+
+* **acis-core:** add Appeal.brief_filed ([#128](https://github.com/sloria/eoir-api/issues/128)) ([1f18222](https://github.com/sloria/eoir-api/commit/1f18222bb120380a8400d5ca03baf91b5d5cd285))
+
 ## [1.4.0](https://github.com/sloria/eoir-api/compare/acis-core-v1.3.0...acis-core-v1.4.0) (2026-11-23)
 
 
