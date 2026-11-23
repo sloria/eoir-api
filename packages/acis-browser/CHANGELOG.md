@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.9.0](https://github.com/sloria/eoir-api/compare/acis-browser-v3.8.3...acis-browser-v3.9.0) (2026-11-23)
+
+
+### Features
+
+* rename AcisBrowser/AcisError to ACISBrowser/ACISError ([0a992f1](https://github.com/sloria/eoir-api/commit/0a992f15b76b7bb9329846644d0f001a3f2d8d83))
+
+
 ## [3.8.3](https://github.com/sloria/eoir-api/compare/acis-browser-v3.8.2...acis-browser-v3.8.3) (2026-11-20)
 
 
