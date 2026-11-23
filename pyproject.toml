@@ -25,6 +25,7 @@ eoir-api = "eoir_api.cli:cli"
 [dependency-groups]
 dev = [
     "anyio>=4.0.0",
+    "eoir-api-client",
     "pytest>=8.3.4",
     "ruff>=0.11.6",
     "time-machine>=2.16.0",
@@ -45,6 +46,7 @@ members = ["packages/*"]
 [tool.uv.sources]
 acis-browser = { workspace = true }
 acis-core = { workspace = true }
+eoir-api-client = { workspace = true }
 
 [tool.ruff]
 fix = true
@@ -102,6 +104,11 @@ ignore = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "packages/acis-browser/tests", "packages/acis-core/tests"]
+testpaths = [
+    "tests",
+    "packages/acis-browser/tests",
+    "packages/acis-core/tests",
+    "packages/eoir-api-client/tests",
+]
 addopts = "-m 'not live' --import-mode=importlib"
 markers = ["live: hits the real ACIS site with a real browser"]

@@ -5,6 +5,7 @@ on:
     tags:
       - "acis-browser-v*"
       - "acis-core-v*"
+      - "eoir-api-client-v*"
 
 permissions:
   contents: read
