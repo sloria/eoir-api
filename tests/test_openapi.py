@@ -47,3 +47,20 @@ async def test_schema_documents_acis_payload(client):
 async def test_schema_excludes_portal(client):
     paths = (await client.get("/schema/openapi.json")).json()["paths"]
     assert not any(p.startswith("/portal") for p in paths)
+
+
+async def test_schema_description_uses_request_base_url(client):
+    spec = (
+        await client.get(
+            "/schema/openapi.json",
+            headers={"host": "eoir.example.org"},
+        )
+    ).json()
+    assert 'Client("http://eoir.example.org", ' in spec["info"]["description"]
+    assert "{base_url}" not in spec["info"]["description"]
+
+
+async def test_schema_root_serves_scalar(client):
+    response = await client.get("/schema")
+    assert response.headers["content-type"].startswith("text/html")
+    assert "scalar" in response.text.lower()
