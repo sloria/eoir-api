@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/sloria/eoir-api/compare/eoir-api-v1.1.0...eoir-api-v1.2.0) (2026-11-24)
+
+
+### Features
+
+* add eoir-api-client ([#131](https://github.com/sloria/eoir-api/issues/131)) ([ec982ed](https://github.com/sloria/eoir-api/commit/ec982ede05ef90e4838c3602784202f5d7ed01d1))
+
+
+### Documentation
+
+* **api:** document official Python client ([#135](https://github.com/sloria/eoir-api/issues/135)) ([5e65425](https://github.com/sloria/eoir-api/commit/5e654258421efaccace1b3e631e356c06f2ff25f))
+
 ## [1.1.0](https://github.com/sloria/eoir-api/compare/eoir-api-v1.0.2...eoir-api-v1.1.0) (2026-11-23)
 
 
