@@ -40,7 +40,7 @@ from sqlspec.extensions.litestar import SQLSpecPlugin
 
 from eoir_api.auth import SESSION_MAX_AGE, TenantAuthMiddleware
 from eoir_api.exceptions import BrowserUnavailableError
-from eoir_api.lib.openapi import DescribedTypedDictPlugin
+from eoir_api.lib.openapi import BaseURLJsonRenderPlugin, DescribedTypedDictPlugin
 from eoir_api.portal import PortalController, register_filters
 from eoir_api.request_id import RequestIdMiddleware
 from eoir_api.routes import ROUTE_HANDLERS
@@ -150,6 +150,24 @@ Your key has a quota over a rolling 24-hour window. Check your usage in the [API
 ## Caching
 
 Successful lookups are cached for 3 hours. Check `cached` and `retrieved_at` in the response. Set `refresh` to `true` to force a fresh lookup, which counts against quota.
+
+## Python client
+
+```console
+pip install eoir-api-client
+```
+
+```python
+import eoir_api_client
+
+with eoir_api_client.Client("{base_url}", "my-api-key") as client:
+    result = client.lookup("123456789", "Mexico")
+    print(result.case.name)
+```
+
+It raises `RetryLaterError` for `429` and `503`, with the wait in `retry_after`, and `QuotaExceededError` when the quota is used up.
+
+See the [README](https://github.com/sloria/eoir-api/tree/main/packages/eoir-api-client#readme) for async usage and retry examples.
 """
 
 
@@ -169,7 +187,8 @@ def create_openapi_config() -> OpenAPIConfig:
                     "hideClientButton": True,
                     "withDefaultFonts": False,
                 },
-            )
+            ),
+            BaseURLJsonRenderPlugin(),
         ],
         components=Components(
             security_schemes={

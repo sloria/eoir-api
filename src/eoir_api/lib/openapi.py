@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
+from litestar.openapi.plugins import JsonRenderPlugin
 from litestar.params import ParameterKwarg
 from litestar.plugins import OpenAPISchemaPlugin
 from litestar.typing import FieldDefinition
 
 if TYPE_CHECKING:
+    from litestar import Request
     from litestar._openapi.schema_generation import SchemaCreator
     from litestar.openapi.spec import Schema
 
@@ -47,4 +49,20 @@ class DescribedTypedDictPlugin(OpenAPISchemaPlugin):
             field_definition,
             required=sorted(field_definition.type_.__required_keys__),
             property_fields=properties,
+        )
+
+
+BASE_URL_PLACEHOLDER = "{base_url}"
+
+
+class BaseURLJsonRenderPlugin(JsonRenderPlugin):
+    """Render the OpenAPI schema as JSON, filling the description's base URL from the request."""
+
+    def render(self, request: Request, openapi_schema: dict[str, Any]) -> bytes:
+        info = openapi_schema["info"]
+        base_url = str(request.base_url).rstrip("/")
+        description = info["description"].replace(BASE_URL_PLACEHOLDER, base_url)
+        return super().render(
+            request,
+            {**openapi_schema, "info": {**info, "description": description}},
         )
