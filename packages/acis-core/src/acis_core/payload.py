@@ -30,7 +30,9 @@ class ACISData(TypedDict, total=False):
     AlienName: Annotated[str, "Name in the format: `LAST, FIRST`."]
     CaseID: int
     OSC_Date: Date
-    ClockStatus: str | None
+    ClockStatus: Annotated[
+        str | None, "`R` if asylum clock is still running. `S` or `X` if stopped."
+    ]
     ElapsedDays: Annotated[str | None, "An integer, as a string."]
     LatestHearingDate: Date
     LatestHearingTime: Time
