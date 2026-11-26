@@ -97,6 +97,21 @@ def test_hearing_type(code, expected):
     assert case.hearing_type(code) == expected
 
 
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        ("R", "running"),
+        ("S", "stopped"),
+        ("X", "stopped"),
+        ("r", "running"),
+        ("?", None),
+        (None, None),
+    ],
+)
+def test_clock_status(code, expected):
+    assert case.clock_status(code) == expected
+
+
 ##### Decision outcomes #####
 
 
@@ -312,6 +327,7 @@ def test_hearing_from_a_scheduled_case(master_hearing):
     assert hearing.medium == "in_person"
     assert hearing.judge == "Roe, Alex"
     assert hearing.location == "26 FEDERAL PLZ, 12TH FL RM1237, NEW YORK, NY 10278"
+    assert hearing.proceeding_id == 20000001
 
 
 def test_no_hearing_once_a_case_is_decided(removal_ordered):
@@ -433,7 +449,92 @@ def test_appeal_brief_filed():
     assert appeal.brief_filed == dt.date(2026, 9, 10)
 
 
+def test_dhs_briefs_are_decoded():
+    payload: ACISPayload = {
+        "Appeal": {
+            "DHSBriefDue": "2026-09-15T00:00:00",
+            "DHSBriefFiled": "2026-09-10T00:00:00",
+        },
+    }
+    appeal = case.Case.from_payload(payload).appeal
+    assert appeal.dhs_brief_due == dt.date(2026, 9, 15)
+    assert appeal.dhs_brief_filed == dt.date(2026, 9, 10)
+    assert appeal.brief_due is None
+
+
+def test_webex_url_for_an_internet_hearing(master_hearing):
+    master_hearing["Schedule"]["HearingMedium"] = "W"
+    hearing = case.Case.from_payload(master_hearing).hearing
+    assert hearing is not None
+    assert hearing.webex_url == "https://eoir.webex.com/meet/IJ.Roe"
+
+
+def test_no_webex_url_for_an_in_person_hearing(master_hearing):
+    hearing = case.Case.from_payload(master_hearing).hearing
+    assert hearing is not None
+    assert hearing.webex_url is None
+
+
+def test_zero_proceeding_id_is_unknown(master_hearing):
+    master_hearing["Schedule"]["ProceedingID"] = 0
+    hearing = case.Case.from_payload(master_hearing).hearing
+    assert hearing is not None
+    assert hearing.proceeding_id is None
+
+
+def test_decision_keeps_the_other_completion_code():
+    decision = case.Case.from_payload(payload(other_comp="F")).decision
+    assert decision is not None
+    assert decision.other_completion == "F"
+
+
+def test_unrecognised_clock_code_is_kept(master_hearing):
+    master_hearing["Data"]["ClockStatus"] = "Q"
+    clock = case.Case.from_payload(master_hearing).clock
+    assert clock.status is None
+    assert clock.code == "Q"
+
+
 ##### Case #####
+
+
+def test_case_identifier_and_dates(master_hearing):
+    decoded = case.Case.from_payload(master_hearing)
+    assert decoded.case_id == 10000001
+    assert decoded.nta_date == dt.date(2025, 1, 16)
+    assert decoded.docket_date == dt.date(2025, 1, 17)
+
+
+def test_court_is_known_without_a_scheduled_hearing(removal_ordered):
+    court = case.Case.from_payload(removal_ordered).court
+    assert court == case.Court(
+        name="NEW YORK CITY, NEW YORK",
+        address="26 FEDERAL PLZ, 12TH FL RM1237, NEW YORK, NY 10278",
+        phone="2126026500",
+    )
+
+
+def test_court_phone_is_unknown_when_contact_info_has_none(removal_ordered):
+    removal_ordered["Data"]["CaseContactInfo"] = "26 FEDERAL PLZ|NEW YORK, NY 10278"
+    assert case.Case.from_payload(removal_ordered).court.phone is None
+
+
+def test_clock(master_hearing):
+    clock = case.Case.from_payload(master_hearing).clock
+    assert clock == case.AsylumClock(status="running", code="R", elapsed_days=543)
+
+
+@pytest.mark.parametrize("value", [None, "", "n/a"])
+def test_unparseable_elapsed_days_are_unknown(master_hearing, value):
+    master_hearing["Data"]["ElapsedDays"] = value
+    assert case.Case.from_payload(master_hearing).clock.elapsed_days is None
+
+
+def test_repr_omits_identifiers(master_hearing):
+    text = repr(case.Case.from_payload(master_hearing))
+    assert "DOE" not in text
+    assert "10000001" not in text
+    assert "20000001" not in text
 
 
 def test_case_from_a_scheduled_payload(master_hearing):

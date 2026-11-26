@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import datetime as dt
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, TypeAlias
 
 from acis_core.payload import ACISPayload
 
 HearingType: TypeAlias = Literal["master", "individual"]
 HearingMedium: TypeAlias = Literal["internet", "in_person"]
+ClockStatus: TypeAlias = Literal["running", "stopped"]
 
 DecisionOutcome: TypeAlias = Literal[
     "removal_ordered",
@@ -84,6 +85,10 @@ HEARING_MEDIUMS: dict[str, HearingMedium] = {
     **dict.fromkeys("PV", "in_person"),
 }
 HEARING_TYPES: dict[str, HearingType] = {"M": "master", "I": "individual"}
+CLOCK_STATUSES: dict[str, ClockStatus] = {
+    "R": "running",
+    **dict.fromkeys("SX", "stopped"),
+}
 
 # AdjTime is a display string ("8:30 AM"), not ISO.
 _TIME_FORMATS = ("%I:%M %p", "%I:%M:%S %p", "%H:%M", "%H:%M:%S")
@@ -116,15 +121,34 @@ def split_pipe(value: Any) -> list[str]:
     return [part.strip() for part in value.split("|") if part.strip()]
 
 
-def parse_hearing_location(value: Any) -> str | None:
+def split_hearing_location(value: Any) -> tuple[str | None, str | None]:
+    """Split a hearing location into court name and street address."""
     segments = split_pipe(value)
+    name = None
     if len(segments) > 1:
-        segments = segments[1:]
-    return ", ".join(segments) or None
+        name, *segments = segments
+    return name, ", ".join(segments) or None
+
+
+def parse_hearing_location(value: Any) -> str | None:
+    return split_hearing_location(value)[1]
+
+
+def parse_phone(value: Any) -> str | None:
+    """Return the trailing phone segment of a contact address, if any."""
+    segments = split_pipe(value)
+    return segments[-1] if segments and segments[-1].isdigit() else None
 
 
 def _text(value: Any) -> str | None:
     return (value.strip() or None) if isinstance(value, str) else None
+
+
+def _int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _code(value: Any) -> str:
@@ -137,6 +161,10 @@ def hearing_medium(code: Any) -> HearingMedium | None:
 
 def hearing_type(code: Any) -> HearingType | None:
     return HEARING_TYPES.get(_code(code))
+
+
+def clock_status(code: Any) -> ClockStatus | None:
+    return CLOCK_STATUSES.get(_code(code))
 
 
 ##### Decision tables #####
@@ -301,6 +329,8 @@ class Hearing:
     medium: HearingMedium | None = None
     judge: str | None = None
     location: str | None = None
+    webex_url: str | None = None
+    proceeding_id: int | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)
@@ -309,6 +339,8 @@ class Decision:
     outcome: DecisionOutcome | None
     code: str | None = None
     case_type: str | None = None
+    other_completion: str | None = None
+    judge: str | None = None
 
     @property
     def is_removal_order(self) -> bool:
@@ -334,10 +366,26 @@ class Appeal:
     due: dt.date | None = None
     brief_due: dt.date | None = None
     brief_filed: dt.date | None = None
+    dhs_brief_due: dt.date | None = None
+    dhs_brief_filed: dt.date | None = None
     type: AppealType | None = None
     pending_at_bia: bool = False
     bia_outcome: BiaOutcome | None = None
     bia_decision_date: dt.date | None = None
+
+
+@dataclass(frozen=True)
+class Court:
+    name: str | None = None
+    address: str | None = None
+    phone: str | None = None
+
+
+@dataclass(frozen=True)
+class AsylumClock:
+    status: ClockStatus | None = None
+    code: str | None = None
+    elapsed_days: int | None = None
 
 
 def _parse_hearing(payload: ACISPayload) -> Hearing | None:
@@ -345,19 +393,30 @@ def _parse_hearing(payload: ACISPayload) -> Hearing | None:
     date = parse_date(schedule.get("AdjDate"))
     if date is None:
         return None
+    medium = hearing_medium(schedule.get("HearingMedium"))
+    # Upstream sets the link for in-person hearings too.
+    webex_url = _text(schedule.get("IJ_WebExURLLink")) if medium == "internet" else None
     return Hearing(
         date=date,
         time=parse_time(schedule.get("AdjTime")),
         type=hearing_type(schedule.get("CalType")),
-        medium=hearing_medium(schedule.get("HearingMedium")),
+        medium=medium,
         judge=_text(schedule.get("IJ_Name")),
         location=parse_hearing_location(schedule.get("HearingLocationAddress")),
+        webex_url=webex_url,
+        # 0 when nothing is scheduled.
+        proceeding_id=_int(schedule.get("ProceedingID")) or None,
     )
 
 
 @dataclass(frozen=True)
 class Case:
-    name: str | None = None
+    name: str | None = field(default=None, repr=False)
+    case_id: int | None = field(default=None, repr=False)
+    nta_date: dt.date | None = None
+    docket_date: dt.date | None = None
+    court: Court = Court()
+    clock: AsylumClock = AsylumClock()
     hearing: Hearing | None = None
     decision: Decision | None = None
     appeal: Appeal = Appeal()
@@ -366,8 +425,14 @@ class Case:
 
     @classmethod
     def from_payload(cls, payload: ACISPayload) -> Case:
+        data = payload.get("Data") or {}
         return cls(
-            name=(payload.get("Data") or {}).get("AlienName"),
+            name=data.get("AlienName"),
+            case_id=_int(data.get("CaseID")),
+            nta_date=parse_date(data.get("OSC_Date")),
+            docket_date=parse_date(data.get("DocketDate")),
+            court=_parse_court(payload),
+            clock=_parse_clock(payload),
             hearing=_parse_hearing(payload),
             decision=_parse_decision(payload),
             appeal=_parse_appeal(payload),
@@ -377,6 +442,24 @@ class Case:
 
 
 ##### Parser functions #####
+
+
+def _parse_court(payload: ACISPayload) -> Court:
+    data = payload.get("Data") or {}
+    proceeding = payload.get("Proceeding") or {}
+    name, address = split_hearing_location(proceeding.get("HearingLocationAddress"))
+    return Court(
+        name=name, address=address, phone=parse_phone(data.get("CaseContactInfo"))
+    )
+
+
+def _parse_clock(payload: ACISPayload) -> AsylumClock:
+    data = payload.get("Data") or {}
+    return AsylumClock(
+        status=clock_status(data.get("ClockStatus")),
+        code=_text(data.get("ClockStatus")),
+        elapsed_days=_int(data.get("ElapsedDays")),
+    )
 
 
 def _parse_decision(payload: ACISPayload) -> Decision | None:
@@ -389,6 +472,8 @@ def _parse_decision(payload: ACISPayload) -> Decision | None:
         outcome=decision_outcome(payload),
         code=proceeding.get("DecisionCode"),
         case_type=proceeding.get("CaseType"),
+        other_completion=_text(proceeding.get("OtherComp")),
+        judge=_text(proceeding.get("IJName")),
     )
 
 
@@ -430,6 +515,8 @@ def _parse_appeal(payload: ACISPayload) -> Appeal:
         due=parse_date(proceeding.get("DateAppealDue")),
         brief_due=parse_date(appeal_data.get("AlienBriefDue")),
         brief_filed=parse_date(appeal_data.get("AlienBriefFiled")),
+        dhs_brief_due=parse_date(appeal_data.get("DHSBriefDue")),
+        dhs_brief_filed=parse_date(appeal_data.get("DHSBriefFiled")),
         type=appeal_type(appeal_data.get("AppealType")),
         pending_at_bia=bool(data.get("PendingAtBIA")),
         bia_outcome=bia_outcome(appeal_data.get("BIADecision")),
