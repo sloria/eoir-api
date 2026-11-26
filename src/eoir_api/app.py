@@ -58,6 +58,10 @@ logger = structlog.get_logger()
 
 HERE = Path(__file__).parent
 SCHEMA_ASSETS_PATH = "/schema/assets"
+FAVICON = (
+    f'<link rel="icon" href="{SCHEMA_ASSETS_PATH}/favicon.ico" sizes="32x32">'
+    f'<link rel="icon" href="{SCHEMA_ASSETS_PATH}/favicon.svg" type="image/svg+xml">'
+)
 
 
 ##### Lifecycle hooks #####
@@ -153,6 +157,8 @@ Successful lookups are cached for 3 hours. Check `cached` and `retrieved_at` in 
 
 ## Python client
 
+An official Python client is available [on PyPI](https://pypi.org/project/eoir-api-client/).
+
 ```console
 pip install eoir-api-client
 ```
@@ -160,14 +166,16 @@ pip install eoir-api-client
 ```python
 import eoir_api_client
 
-with eoir_api_client.Client("{base_url}", "my-api-key") as client:
-    result = client.lookup("123456789", "Mexico")
+with eoir_api_client.Client(
+    "{base_url}", "eoir_...",
+) as client:
+    result = client.lookup("123456789", "MX")
     print(result.case.name)
 ```
 
 It raises `RetryLaterError` for `429` and `503`, with the wait in `retry_after`, and `QuotaExceededError` when the quota is used up.
 
-See the [README](https://github.com/sloria/eoir-api/tree/main/packages/eoir-api-client#readme) for async usage and retry examples.
+See the [README](https://github.com/sloria/eoir-api/tree/main/packages/eoir-api-client#readme) for more documentation.
 """
 
 
@@ -180,6 +188,7 @@ def create_openapi_config() -> OpenAPIConfig:
         render_plugins=[
             ScalarRenderPlugin(
                 css_url=f"{SCHEMA_ASSETS_PATH}/scalar.css",
+                favicon=FAVICON,
                 options={
                     "agent": {"disabled": True},
                     "showToolbar": "never",
