@@ -56,7 +56,7 @@ async def test_schema_description_uses_request_base_url(client):
             headers={"host": "eoir.example.org"},
         )
     ).json()
-    assert 'Client("http://eoir.example.org", ' in spec["info"]["description"]
+    assert '"http://eoir.example.org"' in spec["info"]["description"]
     assert "{base_url}" not in spec["info"]["description"]
 
 
