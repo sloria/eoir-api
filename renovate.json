@@ -15,10 +15,16 @@
       "minimumReleaseAge": "7 days"
     },
     {
-      "matchFileNames": ["pyproject.toml"],
+      "matchManagers": ["pep621"],
       "matchDepTypes": ["project.dependencies"],
       "semanticCommitType": "deps",
       "semanticCommitScope": null
+    },
+    {
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["project.dependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "runtime dependencies"
     },
     {
       "matchPackageNames": ["patchright"],
