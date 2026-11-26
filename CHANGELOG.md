@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/sloria/eoir-api/compare/eoir-api-v1.2.0...eoir-api-v1.3.0) (2026-11-26)
+
+
+### Features
+
+* add favicon ([#137](https://github.com/sloria/eoir-api/issues/137)) ([72ac21d](https://github.com/sloria/eoir-api/commit/72ac21da085dc0743048bc1317beedc7874e7afa))
+
+
+### Dependencies
+
+* lock file maintenance ([#141](https://github.com/sloria/eoir-api/issues/141)) ([6d29032](https://github.com/sloria/eoir-api/commit/6d29032da7bd6a9e6b021b1980c0ae049d5cecb5))
+
 ## [1.2.0](https://github.com/sloria/eoir-api/compare/eoir-api-v1.1.0...eoir-api-v1.2.0) (2026-11-24)
 
 
