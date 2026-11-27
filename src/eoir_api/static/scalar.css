@@ -44,6 +44,7 @@
   --scalar-font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --scalar-link-color: var(--scalar-color-accent);
+  --scalar-link-color-visited: var(--scalar-link-color);
   --scalar-button-1: var(--scalar-color-accent);
   --scalar-button-1-color: #fff;
   --scalar-button-1-hover: color-mix(in srgb, var(--scalar-color-accent) 85%, #000);
