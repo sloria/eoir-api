@@ -78,8 +78,9 @@
     });
     document.getElementById("tz-note").textContent = `Times in ${tz}`;
     for (const el of document.querySelectorAll("time[datetime]")) {
-      el.textContent = fmt.format(new Date(el.dateTime));
-      el.title = el.dateTime;
+      const date = new Date(el.dateTime);
+      el.textContent = fmt.format(date);
+      el.title = `${date.toISOString().slice(0, 19)}Z`;
     }
 
     // Keep the scroll position across paging and filtering.
