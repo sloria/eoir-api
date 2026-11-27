@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.0.0](https://github.com/sloria/eoir-api/compare/eoir-api-v1.3.0...eoir-api-v2.0.0) (2026-11-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* return errors as RFC 9457 problems with a code on 404s
+
+### Features
+
+* **eoir-api-client:** expose error code ([df29bca](https://github.com/sloria/eoir-api/commit/df29bcafadbe206c1dd5cbb5d3fd49a7670ad4d0))
+* return errors as RFC 9457 problems with a code on 404s ([0c297d7](https://github.com/sloria/eoir-api/commit/0c297d7454846d27e636d6421dd6f94a68f97ef2))
+
+
+### Bug Fixes
+
+* evict cache on write to avoid memory leak ([79e48bc](https://github.com/sloria/eoir-api/commit/79e48bc6f244e9797495923651bfd16e1644125f))
+* more config validation (duplicate tenants, out of bounds) ([b96e628](https://github.com/sloria/eoir-api/commit/b96e6282ed9ce3345a89d34f1b0cfab607351ca3))
+
+
+### Documentation
+
+* document errors ([05a4631](https://github.com/sloria/eoir-api/commit/05a46313f7421031a31450a1da4a369d32a9ac1e))
+
 ## [1.3.0](https://github.com/sloria/eoir-api/compare/eoir-api-v1.2.0...eoir-api-v1.3.0) (2026-11-26)
 
 
