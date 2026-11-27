@@ -35,9 +35,11 @@ _CLIENT_ERRORS: dict[int, type[APIError]] = {
 
 def parse_response(response: httpx2.Response) -> LookupResult:
     """Return the lookup result, or raise the error the response stands for."""
-    quota = _quota(response.headers)
-    request_id = response.headers.get("x-request-id")
     status_code = response.status_code
+    meta: dict[str, Any] = {
+        "quota": _quota(response.headers),
+        "request_id": response.headers.get("x-request-id"),
+    }
     if status_code == 200:
         data = response.json()
         nationality = data["nationality"]
@@ -47,28 +49,21 @@ def parse_response(response: httpx2.Response) -> LookupResult:
             retrieved_at=dt.datetime.fromisoformat(data["retrieved_at"]),
             cached=data["cached"],
             acis=data["acis"],
-            quota=quota,
-            request_id=request_id,
+            **meta,
         )
 
     body = _error_body(response)
-    extra: dict[str, Any] = {}
+    detail = body.get("detail") or response.reason_phrase
+    meta["status_code"] = status_code
     if body.get("code") == "quota_exceeded":
-        error_class = QuotaExceededError if quota else APIError
-    elif status_code in {429, 503}:
-        error_class = RetryLaterError
-        extra["retry_after"] = _retry_after(response.headers)
-    elif status_code >= 500:
-        error_class = ServerError
-    else:
-        error_class = _CLIENT_ERRORS.get(status_code, APIError)
-    raise error_class(
-        body.get("detail") or response.reason_phrase,
-        status_code=status_code,
-        quota=quota,
-        request_id=request_id,
-        **extra,
-    )
+        raise (QuotaExceededError if meta["quota"] else APIError)(detail, **meta)
+    if status_code in {429, 503}:
+        raise RetryLaterError(
+            detail, retry_after=_retry_after(response.headers), **meta
+        )
+    if status_code >= 500:
+        raise ServerError(detail, **meta)
+    raise _CLIENT_ERRORS.get(status_code, APIError)(detail, **meta)
 
 
 def _error_body(response: httpx2.Response) -> dict[str, Any]:
