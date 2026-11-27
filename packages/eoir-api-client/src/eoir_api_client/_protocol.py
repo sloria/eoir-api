@@ -55,8 +55,8 @@ def parse_response(response: httpx2.Response) -> LookupResult:
     body = _error_body(response)
     detail = body.get("detail") or response.reason_phrase
     meta["status_code"] = status_code
-    if body.get("code") == "quota_exceeded":
-        raise (QuotaExceededError if meta["quota"] else APIError)(detail, **meta)
+    if body.get("code") == "quota_exceeded" and meta["quota"]:
+        raise QuotaExceededError(detail, **meta)
     if status_code in {429, 503}:
         raise RetryLaterError(
             detail, retry_after=_retry_after(response.headers), **meta
