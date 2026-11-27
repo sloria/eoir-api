@@ -4,8 +4,9 @@
 -- param: outcome str
 -- param: cached int
 -- param: duration_ms int?
-INSERT INTO lookups (tenant, ts, outcome, cached, duration_ms)
-VALUES (?, ?, ?, ?, ?);
+-- param: request_id str?
+INSERT INTO lookups (tenant, ts, outcome, cached, duration_ms, request_id)
+VALUES (?, ?, ?, ?, ?, ?);
 
 -- name: outcomes_since
 -- param: tenant str
@@ -25,7 +26,7 @@ DELETE FROM lookups WHERE ts < ?;
 -- param: after str?
 -- param: limit int
 -- A null bound makes its comparison null, which coalesce turns into true.
-SELECT ts, outcome, cached, duration_ms
+SELECT ts, outcome, cached, duration_ms, request_id
 FROM lookups
 WHERE tenant = ? AND coalesce(ts < ?, 1) AND coalesce(ts >= ?, 1)
 ORDER BY ts DESC, id DESC
@@ -36,7 +37,7 @@ LIMIT ?;
 -- param: cursor str
 -- param: before str?
 -- param: limit int
-SELECT ts, outcome, cached, duration_ms
+SELECT ts, outcome, cached, duration_ms, request_id
 FROM lookups
 WHERE tenant = ? AND ts > ? AND coalesce(ts < ?, 1)
 ORDER BY ts ASC, id ASC

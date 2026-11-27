@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
-import re
+from html.parser import HTMLParser
 
 import msgspec
 import pytest
@@ -24,13 +24,60 @@ async def login(client, key="metered-test-secret"):
     return await client.post("/portal/login", data=data, follow_redirects=False)
 
 
-def page_link(html: str, label: str) -> str | None:
-    match = re.search(rf'href="([^"]*)">{label}<', html)
-    return match and match[1].replace("&amp;", "&")
+class Page(HTMLParser):
+    """The parts of a portal page the tests read, free of markup."""
+
+    def __init__(self, html: str) -> None:
+        super().__init__()
+        self.rows: list[list[str]] = []
+        self.options: list[str] = []
+        self.selected: str | None = None
+        self.links: dict[str, str] = {}
+        self.fields: dict[str, str | None] = {}
+        self._chunks: list[str] = []
+        self._open: dict[str, tuple[int, dict[str, str | None]]] = {}
+        self._script = False
+        self.feed(html)
+        self.text = " ".join(self._chunks)
+
+    @property
+    def statuses(self) -> list[str]:
+        return [row[0] for row in self.rows]
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag in ("li", "option", "a"):
+            self._open[tag] = (len(self._chunks), attrs)
+        elif tag == "input":
+            self.fields[attrs["name"]] = attrs.get("value")
+        self._script = tag == "script"
+
+    def handle_data(self, data):
+        if not self._script and data.strip():
+            self._chunks.append(" ".join(data.split()))
+
+    def handle_endtag(self, tag):
+        self._script = False
+        if tag not in self._open:
+            return
+        start, attrs = self._open.pop(tag)
+        chunks = self._chunks[start:]
+        if tag == "li":
+            self.rows.append(chunks)
+        elif tag == "a":
+            self.links[" ".join(chunks)] = attrs["href"] or ""
+        else:
+            self.options.append(" ".join(chunks))
+            if "selected" in attrs:
+                self.selected = self.options[-1]
 
 
 async def portal(client, **params):
     return await client.get("/portal", params=params, follow_redirects=False)
+
+
+async def portal_page(client, **params) -> Page:
+    return Page((await portal(client, **params)).text)
 
 
 ##### Login #####
@@ -153,52 +200,60 @@ async def test_portal_shows_usage_against_quota(client, usage_service):
 async def test_portal_shows_count_for_unlimited_tenant(client, usage_service):
     await seed(usage_service, dt.timedelta(hours=1), tenant="owner")
     await login(client, key="owner-test-secret")
-    text = (await portal(client)).text
-    assert "1</strong>" in text
-    assert "left" not in text
+    page = await portal_page(client)
+    assert "1 lookup in the past 24 hours" in page.text
+    assert "left" not in page.text
 
 
 async def test_portal_lists_lookups_with_status(client):
     await lookup(client, body={"a_number": "123-456-789", "nationality": "VE"})
     await login(client)
-    text = (await portal(client)).text
-    assert "123456789" not in text
-    assert ">OK<" in text
+    page = await portal_page(client)
+    assert "123456789" not in page.text
+    assert page.statuses == ["OK"]
+
+
+async def test_portal_shows_request_id_of_each_lookup(client, usage_service):
+    await seed(usage_service, dt.timedelta(hours=1))  # recorded without an id
+    response = await lookup(client)
+    await login(client)
+    page = await portal_page(client)
+    assert [response.headers["x-request-id"] in row for row in page.rows] == [
+        True,
+        False,
+    ]
 
 
 async def test_portal_lookups_are_tenant_scoped(client, usage_service):
     await seed(usage_service, dt.timedelta(hours=1), tenant="owner", outcome="captcha")
     await login(client)
-    text = (await portal(client)).text
-    assert "Temporarily unavailable" not in text
-    assert "No lookups" in text
+    page = await portal_page(client)
+    assert page.statuses == ["No lookups"]
 
 
 async def test_portal_paginates_newest_first(client, usage_service):
     await seed(usage_service, *(dt.timedelta(minutes=m) for m in range(15)))
     await login(client)
-    first = (await portal(client)).text
-    assert "Jul 25, 12:00" in first
-    assert "Jul 25, 11:51" in first
-    assert "Jul 25, 11:50" not in first
-    assert page_link(first, "Previous") is None
-    assert "1\N{EN DASH}10 of 15" in first
-    next_url = page_link(first, "Next")
+    first = await portal_page(client)
+    assert "Jul 25, 12:00" in first.text
+    assert "Jul 25, 11:51" in first.text
+    assert "Jul 25, 11:50" not in first.text
+    assert "Previous" not in first.links
+    assert "1\N{EN DASH}10 of 15" in first.text
 
-    rest = (await client.get(next_url, follow_redirects=False)).text
-    assert "Jul 25, 11:50" in rest
-    assert "Jul 25, 11:51" not in rest
-    assert page_link(rest, "Next") is None
-    assert "11\N{EN DASH}15 of 15" in rest
-    prev_url = page_link(rest, "Previous")
+    rest = Page((await client.get(first.links["Next"])).text)
+    assert "Jul 25, 11:50" in rest.text
+    assert "Jul 25, 11:51" not in rest.text
+    assert "Next" not in rest.links
+    assert "11\N{EN DASH}15 of 15" in rest.text
 
-    back = (await client.get(prev_url)).text
-    assert "Jul 25, 12:00" in back
-    assert "Jul 25, 11:51" in back
-    assert "Jul 25, 11:50" not in back
-    assert page_link(back, "Previous") is None
-    assert "1\N{EN DASH}10 of 15" in back
-    assert page_link(back, "Next")
+    back = Page((await client.get(rest.links["Previous"])).text)
+    assert "Jul 25, 12:00" in back.text
+    assert "Jul 25, 11:51" in back.text
+    assert "Jul 25, 11:50" not in back.text
+    assert "Previous" not in back.links
+    assert "1\N{EN DASH}10 of 15" in back.text
+    assert "Next" in back.links
 
 
 async def test_portal_filters_by_date_range(client, usage_service):
@@ -214,10 +269,9 @@ async def test_portal_filters_by_date_range(client, usage_service):
 async def test_portal_ignores_blank_date_field(client, usage_service):
     await seed(usage_service, *(dt.timedelta(days=d) for d in range(3)))
     await login(client)
-    response = await portal(client, **{"from": "2026-07-24", "to": ""})
-    assert response.status_code == 200
-    assert 'value="2026-07-24"' in response.text
-    assert "Jul 23" not in response.text
+    page = await portal_page(client, **{"from": "2026-07-24", "to": ""})
+    assert page.fields["from"] == "2026-07-24"
+    assert "Jul 23" not in page.text
 
 
 async def test_portal_redirects_on_invalid_date(client):

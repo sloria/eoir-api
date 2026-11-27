@@ -36,6 +36,7 @@ class LookupItem(msgspec.Struct):
     outcome: LookupOutcome
     cached: bool
     duration_ms: int | None
+    request_id: str | None
 
 
 class Quota(msgspec.Struct):
@@ -93,6 +94,7 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
         outcome: LookupOutcome,
         cached: bool,
         duration_ms: int | None = None,
+        request_id: str | None = None,
     ) -> None:
         async with self.begin_transaction() as db:
             await db.execute(
@@ -102,6 +104,7 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
                 outcome,
                 int(cached),
                 duration_ms,
+                request_id,
             )
 
     async def outcomes_since(
@@ -184,6 +187,7 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
 class TenantUsage:
     service: UsageService
     tenant: Tenant
+    request_id: str | None = None
 
     async def record(
         self,
@@ -198,6 +202,7 @@ class TenantUsage:
             outcome=outcome,
             cached=cached,
             duration_ms=duration_ms,
+            request_id=self.request_id,
         )
 
     async def quota(self) -> Quota | None:

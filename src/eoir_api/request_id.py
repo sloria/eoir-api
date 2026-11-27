@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class RequestIdMiddleware(ASGIMiddleware):
-    """Tag a request's logs and response with a generated ``x-request-id``."""
+    """Tag a request's logs, state and response with a generated ``x-request-id``."""
 
     scopes = (ScopeType.HTTP,)
 
@@ -21,6 +21,7 @@ class RequestIdMiddleware(ASGIMiddleware):
         self, scope: Scope, receive: Receive, send: Send, next_app: ASGIApp
     ) -> None:
         request_id = uuid4().hex
+        scope.setdefault("state", {})["request_id"] = request_id
 
         async def send_with_id(message: Message) -> None:
             if message["type"] == "http.response.start":
