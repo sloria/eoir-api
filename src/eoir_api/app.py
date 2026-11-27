@@ -5,6 +5,7 @@ import logging
 import sys
 import time
 from contextlib import asynccontextmanager
+from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -17,6 +18,7 @@ from litestar import Litestar, Request
 from litestar.config.csrf import CSRFConfig
 from litestar.datastructures import State
 from litestar.di import Provide
+from litestar.exceptions import HTTPException
 from litestar.logging.config import (
     LoggingConfig,
     StructLoggingConfig,
@@ -30,6 +32,11 @@ from litestar.openapi import OpenAPIConfig
 from litestar.openapi.plugins import ScalarRenderPlugin
 from litestar.openapi.spec import Components, SecurityScheme
 from litestar.plugins.jinja import JinjaTemplateEngine
+from litestar.plugins.problem_details import (
+    ProblemDetailsConfig,
+    ProblemDetailsException,
+    ProblemDetailsPlugin,
+)
 from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 from litestar.static_files import create_static_files_router
 from litestar.template import TemplateConfig
@@ -230,6 +237,22 @@ def scrub_sentry_event(event: Any, hint: Any) -> Any:
     return event
 
 
+def to_problem_details(exc: HTTPException) -> ProblemDetailsException:
+    """Describe an HTTP error as an RFC 9457 problem.
+
+    A mapping in ``extra``, e.g. a ``code``, becomes top-level members.
+    A 500's detail is withheld, as Litestar's default handler does.
+    """
+    title = HTTPStatus(exc.status_code).phrase
+    return ProblemDetailsException(
+        status_code=exc.status_code,
+        title=title,
+        detail=title if exc.status_code == 500 else exc.detail,
+        extra=exc.extra,
+        headers=exc.headers,
+    )
+
+
 def proxy_settings(proxy: Proxy | None) -> ProxySettings | None:
     if proxy is None:
         return None
@@ -373,7 +396,16 @@ def build_app(
             TenantAuthMiddleware(settings.tenants),
         ],
         csrf_config=csrf,
-        plugins=[SQLSpecPlugin(sqlspec=spec), DescribedTypedDictPlugin(), *plugins],
+        plugins=[
+            SQLSpecPlugin(sqlspec=spec),
+            DescribedTypedDictPlugin(),
+            ProblemDetailsPlugin(
+                ProblemDetailsConfig(
+                    exception_to_problem_detail_map={HTTPException: to_problem_details}
+                )
+            ),
+            *plugins,
+        ],
         lifespan=[
             make_usage_lifespan(usage_service, usage_config),
             *lifespan,

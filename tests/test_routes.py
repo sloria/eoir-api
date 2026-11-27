@@ -10,6 +10,7 @@ from acis_browser import (
     InvalidNationalityError,
     UpstreamError,
 )
+from litestar.exceptions import InternalServerException
 
 from .conftest import BODY, METERED, lookup_rows
 
@@ -207,16 +208,30 @@ async def test_invalid_nationality_returns_404(client, browser):
     browser.error = InvalidNationalityError("Invalid nationality code")
     response = await lookup(client, {"a_number": A_NUMBER, "nationality": "VE"})
     assert response.status_code == 404
-    assert "nationality" in response.json()["detail"].lower()
+    assert response.json()["code"] == "nationality_mismatch"
 
 
 async def test_case_not_found_returns_404(client, browser):
     browser.error = CaseNotFoundError("No case info found")
     response = await lookup(client, {"a_number": A_NUMBER, "nationality": "VE"})
     assert response.status_code == 404
+    assert response.headers["content-type"] == "application/problem+json"
     assert response.json() == {
-        "status_code": 404,
+        "status": 404,
+        "title": "Not Found",
         "detail": "No case found for that A-Number.",
+        "code": "case_not_found",
+    }
+
+
+async def test_internal_error_detail_is_withheld(client, browser):
+    browser.error = InternalServerException("secret")
+    response = await lookup(client, {"a_number": A_NUMBER, "nationality": "VE"})
+    assert response.status_code == 500
+    assert response.json() == {
+        "status": 500,
+        "title": "Internal Server Error",
+        "detail": "Internal Server Error",
     }
 
 
