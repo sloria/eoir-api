@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/sloria/eoir-api/compare/eoir-api-client-v1.1.0...eoir-api-client-v1.2.0) (2026-11-27)
+
+
+### Features
+
+* **eoir-api-client:** expose error code ([df29bca](https://github.com/sloria/eoir-api/commit/df29bcafadbe206c1dd5cbb5d3fd49a7670ad4d0))
+
 ## [1.1.0](https://github.com/sloria/eoir-api/compare/eoir-api-client-v1.0.0...eoir-api-client-v1.1.0) (2026-11-27)
 
 
