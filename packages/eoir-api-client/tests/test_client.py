@@ -178,6 +178,7 @@ async def test_quota_exceeded(make_lookup):
 
     assert not isinstance(excinfo.value, RetryLaterError)
     assert excinfo.value.quota == QUOTA
+    assert excinfo.value.code == "quota_exceeded"
 
 
 async def test_quota_exceeded_without_quota_headers_says_when_to_retry(make_lookup):
@@ -200,6 +201,7 @@ async def test_non_json_error_still_maps_by_status(make_lookup):
         await make_lookup(sequence(response))("999999999", "VE")
 
     assert excinfo.value.detail
+    assert excinfo.value.code is None
 
 
 async def test_timeout_has_a_message(make_lookup):
