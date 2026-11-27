@@ -33,25 +33,28 @@ class _Base(msgspec.Struct, kw_only=True, forbid_unknown_fields=True):
     pass
 
 
+Seconds = Annotated[int, msgspec.Meta(ge=0)]
+
+
 class Server(_Base):
     host: str = "127.0.0.1"
-    port: int = 8001
+    port: Annotated[int, msgspec.Meta(ge=0, le=65535)] = 8001
     client_ip_header: str | None = None
 
 
 class Chrome(_Base):
     profiles_dir: Path = user_data_path("eoir-api") / "profiles"
-    idle_timeout: int = 900
+    idle_timeout: Seconds = 900
 
 
 class Lookup(_Base):
-    interval: int = 30
-    timeout: int = 20
+    interval: Seconds = 30
+    timeout: Annotated[int, msgspec.Meta(ge=1)] = 20
     attempts: Annotated[int, msgspec.Meta(ge=1)] = 1
     max_browsers: Annotated[int, msgspec.Meta(ge=1)] = 2
-    captcha_cooldown: int = 300
-    cache_ttl: int = 3 * 60 * 60
-    max_queue_wait: int = 30
+    captcha_cooldown: Seconds = 300
+    cache_ttl: Seconds = 3 * 60 * 60
+    max_queue_wait: Seconds = 30
     intercept: bool = False
 
 
@@ -122,6 +125,10 @@ class Settings(_Base):
     def __post_init__(self) -> None:
         if dupes := duplicates(b.name for b in self.browsers):
             raise ValueError(f"duplicate browser names: {', '.join(dupes)}")
+        if dupes := duplicates(t.name for t in self.tenants):
+            raise ValueError(f"duplicate tenant names: {', '.join(dupes)}")
+        if len({t.key for t in self.tenants}) < len(self.tenants):
+            raise ValueError("tenant keys must be unique")
 
     @classmethod
     def load(cls, path: Path) -> Settings:

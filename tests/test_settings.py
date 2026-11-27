@@ -149,6 +149,32 @@ def test_load_rejects_unknown_keys(write_config, text):
         Settings.load(write_config(text))
 
 
+@pytest.mark.parametrize(
+    ("second", "message"),
+    [
+        ('{ name = "owner", key = "another-test-secret" }', "duplicate tenant names"),
+        ('{ name = "other", key = "owner-test-secret" }', "tenant keys must be unique"),
+    ],
+)
+def test_load_rejects_duplicate_tenants(write_config, second, message):
+    first = '{ name = "owner", key = "owner-test-secret" }'
+    with pytest.raises(ConfigurationError, match=message):
+        Settings.load(write_config(f"tenants = [{first}, {second}]"))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "[lookup]\ninterval = -1",
+        "[lookup]\ntimeout = 0",
+        "[server]\nport = 70000",
+    ],
+)
+def test_load_rejects_out_of_range_values(write_config, text):
+    with pytest.raises(ConfigurationError, match="Expected `int`"):
+        Settings.load(write_config(f"{TENANT}\n{text}"))
+
+
 def test_load_rejects_duplicate_browser_names(write_config):
     with pytest.raises(ConfigurationError, match="duplicate browser names: a"):
         Settings.load(
