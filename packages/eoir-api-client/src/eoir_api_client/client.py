@@ -57,7 +57,7 @@ class Client(_BaseClient):
                 self._url("/cases/lookup"), json=body, headers=self._headers
             )
         except httpx2.HTTPError as error:
-            raise NetworkError(str(error)) from error
+            raise NetworkError(str(error) or type(error).__name__) from error
         return parse_response(response)
 
     def close(self) -> None:
@@ -106,7 +106,7 @@ class AsyncClient(_BaseClient):
                 self._url("/cases/lookup"), json=body, headers=self._headers
             )
         except httpx2.HTTPError as error:
-            raise NetworkError(str(error)) from error
+            raise NetworkError(str(error) or type(error).__name__) from error
         return parse_response(response)
 
     async def aclose(self) -> None:
