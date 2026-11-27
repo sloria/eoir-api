@@ -289,7 +289,7 @@ class CaseService:
         self._pending += 1
         self._tenant_pending[tenant.name] += 1
         started = self.clock()
-        outcome: LookupOutcome = "ok"
+        outcome: LookupOutcome = "upstream_error"
         logger.info("lookup.start", pending=self._pending)
         try:
             payload, slot, duration = await self._lookup(a_number, nationality)
@@ -302,6 +302,8 @@ class CaseService:
                     outcome=upstream,
                 )
             raise_for_outcome(payload)
+            entry = self._cache.set(key, cast("ACISPayload", payload))
+            outcome = "ok"
         except Exception as exc:
             outcome = outcome_of(exc)
             logger.warning(
@@ -320,7 +322,6 @@ class CaseService:
                 duration_ms=round((self.clock() - started) * 1000),
             )
 
-        entry = self._cache.set(key, cast("ACISPayload", payload))
         logger.info(
             "lookup.success",
             browser=slot.name,
