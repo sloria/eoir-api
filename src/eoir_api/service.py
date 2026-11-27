@@ -280,6 +280,7 @@ class CaseService:
             )
         now = self.clock()
         if all(slot.in_cooldown(now) for slot in self._slots):
+            await usage.record(outcome="captcha", cached=False)
             raise self._unavailable()
         wait = self.estimated_wait
         if wait > self.settings.lookup.max_queue_wait:

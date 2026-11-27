@@ -285,6 +285,8 @@ async def test_all_browsers_unavailable_raises_with_retry_after(
         await multi_browser_service.get_case("100000001", VE, usage=usage)
     assert 0 < excinfo.value.retry_after <= 300
     assert len(a.calls) == len(b.calls) == 1
+    rejected = (await lookup_rows(usage.service))[-1]
+    assert rejected.outcome == "captcha"
 
 
 async def test_lookup_interval_applies_per_browser(
