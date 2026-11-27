@@ -176,6 +176,19 @@ async def test_quota_exceeded(make_lookup):
     assert excinfo.value.quota == QUOTA
 
 
+async def test_quota_exceeded_without_quota_headers_says_when_to_retry(make_lookup):
+    response = httpx2.Response(
+        429,
+        json={"detail": "Daily quota exceeded", "code": "quota_exceeded"},
+        headers={"Retry-After": "7200"},
+    )
+
+    with pytest.raises(RetryLaterError) as excinfo:
+        await make_lookup(sequence(response))("999999999", "VE")
+
+    assert excinfo.value.retry_after == 7200
+
+
 async def test_non_json_error_still_maps_by_status(make_lookup):
     response = httpx2.Response(502, text="<html>bad gateway</html>")
 
