@@ -271,7 +271,7 @@
     <nav class="site-nav container cluster repel">
       <div class="cluster site-id">
         <a class="wordmark" href="/portal">EOIR API</a>
-        {% if tenant %}<span class="muted">/ {{ tenant.name }}</span>{% endif %}
+        {% if tenant %}<span class="muted" aria-hidden="true">/</span> <span>{{ tenant.name }}</span>{% endif %}
       </div>
       {% if tenant %}
         <div class="cluster">
