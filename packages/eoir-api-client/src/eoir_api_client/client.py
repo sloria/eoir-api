@@ -56,7 +56,7 @@ class Client(_BaseClient):
             response = self._http_client.post(
                 self._url("/cases/lookup"), json=body, headers=self._headers
             )
-        except httpx2.HTTPError as error:
+        except httpx2.TransportError as error:
             raise NetworkError(str(error) or type(error).__name__) from error
         return parse_response(response)
 
@@ -105,7 +105,7 @@ class AsyncClient(_BaseClient):
             response = await self._http_client.post(
                 self._url("/cases/lookup"), json=body, headers=self._headers
             )
-        except httpx2.HTTPError as error:
+        except httpx2.TransportError as error:
             raise NetworkError(str(error) or type(error).__name__) from error
         return parse_response(response)
 
