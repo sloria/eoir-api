@@ -198,6 +198,13 @@ async def test_non_json_error_still_maps_by_status(make_lookup):
     assert excinfo.value.detail
 
 
+async def test_timeout_has_a_message(make_lookup):
+    with pytest.raises(NetworkError) as excinfo:
+        await make_lookup(sequence(httpx2.ReadTimeout("")))("999999999", "VE")
+
+    assert str(excinfo.value) == "ReadTimeout"
+
+
 async def test_network_error(make_lookup):
     with pytest.raises(NetworkError) as excinfo:
         await make_lookup(sequence(httpx2.ConnectError("boom")))("999999999", "VE")
