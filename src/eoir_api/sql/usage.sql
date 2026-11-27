@@ -24,11 +24,14 @@ DELETE FROM lookups WHERE ts < ?;
 -- param: tenant str
 -- param: before str?
 -- param: after str?
+-- param: outcomes str?
 -- param: limit int
 -- A null bound makes its comparison null, which coalesce turns into true.
+-- Null outcomes (a JSON array otherwise) match the row's own outcome.
 SELECT ts, outcome, cached, duration_ms, request_id
 FROM lookups
 WHERE tenant = ? AND coalesce(ts < ?, 1) AND coalesce(ts >= ?, 1)
+  AND outcome IN (SELECT value FROM json_each(coalesce(?, json_array(outcome))))
 ORDER BY ts DESC, id DESC
 LIMIT ?;
 
@@ -36,10 +39,12 @@ LIMIT ?;
 -- param: tenant str
 -- param: cursor str
 -- param: before str?
+-- param: outcomes str?
 -- param: limit int
 SELECT ts, outcome, cached, duration_ms, request_id
 FROM lookups
 WHERE tenant = ? AND ts > ? AND coalesce(ts < ?, 1)
+  AND outcome IN (SELECT value FROM json_each(coalesce(?, json_array(outcome))))
 ORDER BY ts ASC, id ASC
 LIMIT ?;
 
@@ -48,6 +53,7 @@ LIMIT ?;
 -- param: tenant str
 -- param: before str?
 -- param: after str?
-SELECT count(*) AS total, coalesce(sum(ts > ?), 0) AS newer
+SELECT outcome, count(*) AS total, coalesce(sum(ts > ?), 0) AS newer
 FROM lookups
-WHERE tenant = ? AND coalesce(ts < ?, 1) AND coalesce(ts >= ?, 1);
+WHERE tenant = ? AND coalesce(ts < ?, 1) AND coalesce(ts >= ?, 1)
+GROUP BY outcome;
