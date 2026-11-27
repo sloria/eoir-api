@@ -142,6 +142,8 @@ def make_usage_lifespan(
 API_DESCRIPTION = """\
 An unofficial API for EOIR's [Automated Case Information System (ACIS)](https://acis.eoir.justice.gov/).
 
+## Authentication
+
 Authenticate by sending your API key in the `x-api-key` header.
 
 ## Retrying
@@ -155,6 +157,11 @@ A `429` usually means too many lookups are pending, and the wait is typically se
 ## Quota
 
 Your key has a quota over a rolling 24-hour window. Check your usage in the [API Portal](/portal).
+
+## Errors
+
+Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problems,
+sent as `application/problem+json` with `status`, `title` and `detail`. Some also have a `code`.
 
 ## Caching
 
