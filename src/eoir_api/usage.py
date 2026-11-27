@@ -4,7 +4,7 @@ import datetime as dt
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import msgspec
 from sqlspec import SQLFileLoader
@@ -12,6 +12,9 @@ from sqlspec.adapters.aiosqlite import AiosqliteConfig, AiosqliteDriver
 from sqlspec.service import SQLSpecAsyncService
 
 from eoir_api.settings import Tenant
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 QUOTA_WINDOW = dt.timedelta(hours=24)
@@ -67,6 +70,7 @@ class UsageSummary(msgspec.Struct):
 
 
 class LookupCount(msgspec.Struct):
+    outcome: LookupOutcome
     total: int
     newer: int
     """Of ``total``, how many are newer than the given timestamp."""
@@ -88,6 +92,10 @@ def create_config(db_path: Path) -> AiosqliteConfig:
 
 def iso(ts: dt.datetime | None) -> str | None:
     return ts.astimezone(dt.UTC).isoformat() if ts else None
+
+
+def json_array(outcomes: Collection[LookupOutcome] | None) -> str | None:
+    return None if outcomes is None else msgspec.json.encode(sorted(outcomes)).decode()
 
 
 class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
@@ -134,6 +142,7 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
         limit: int,
         before: dt.datetime | None = None,
         after: dt.datetime | None = None,
+        outcomes: Collection[LookupOutcome] | None = None,
     ) -> list[LookupItem]:
         async with self.provide_session() as db:
             rows = await db.select(
@@ -141,6 +150,7 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
                 tenant,
                 iso(before),
                 iso(after),
+                json_array(outcomes),
                 limit,
             )
         # Non-strict so SQLite's 0/1 becomes a bool
@@ -153,6 +163,7 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
         *,
         limit: int,
         before: dt.datetime | None = None,
+        outcomes: Collection[LookupOutcome] | None = None,
     ) -> list[LookupItem]:
         """Return the ``limit`` lookups just newer than ``cursor``, oldest first."""
         async with self.provide_session() as db:
@@ -161,6 +172,7 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
                 tenant,
                 iso(cursor),
                 iso(before),
+                json_array(outcomes),
                 limit,
             )
         return msgspec.convert(rows, list[LookupItem], strict=False)
@@ -172,10 +184,10 @@ class UsageService(SQLSpecAsyncService[AiosqliteDriver]):
         before: dt.datetime | None = None,
         after: dt.datetime | None = None,
         newer_than: dt.datetime | None = None,
-    ) -> LookupCount:
-        """Count lookups in ``[after, before)``, and those newer than ``newer_than``."""
+    ) -> list[LookupCount]:
+        """Count lookups in ``[after, before)`` by outcome."""
         async with self.provide_session() as db:
-            return await db.select_one(
+            return await db.select(
                 queries.get_sql("count_lookups"),
                 iso(newer_than),
                 tenant,
@@ -241,9 +253,14 @@ class TenantUsage:
         limit: int,
         before: dt.datetime | None = None,
         after: dt.datetime | None = None,
+        outcomes: Collection[LookupOutcome] | None = None,
     ) -> list[LookupItem]:
         return await self.service.lookups(
-            self.tenant.name, limit=limit, before=before, after=after
+            self.tenant.name,
+            limit=limit,
+            before=before,
+            after=after,
+            outcomes=outcomes,
         )
 
     async def count(
@@ -252,14 +269,19 @@ class TenantUsage:
         before: dt.datetime | None = None,
         after: dt.datetime | None = None,
         newer_than: dt.datetime | None = None,
-    ) -> LookupCount:
+    ) -> list[LookupCount]:
         return await self.service.count(
             self.tenant.name, before=before, after=after, newer_than=newer_than
         )
 
     async def lookups_after(
-        self, cursor: dt.datetime, *, limit: int, before: dt.datetime | None = None
+        self,
+        cursor: dt.datetime,
+        *,
+        limit: int,
+        before: dt.datetime | None = None,
+        outcomes: Collection[LookupOutcome] | None = None,
     ) -> list[LookupItem]:
         return await self.service.lookups_after(
-            self.tenant.name, cursor, limit=limit, before=before
+            self.tenant.name, cursor, limit=limit, before=before, outcomes=outcomes
         )

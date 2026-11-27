@@ -32,6 +32,10 @@ LABELS: dict[LookupOutcome, str] = {
     "concurrency_limited": "Too many concurrent lookups",
     "queue_full": "Too many pending lookups",
 }
+OUTCOME_FILTERS: dict[str, tuple[str, set[LookupOutcome]]] = {
+    "failed": ("Failed", FAILED),
+    **{outcome: (label, {outcome}) for outcome, label in LABELS.items()},
+}
 PAGE_SIZE = 10
 
 
@@ -82,6 +86,15 @@ def parse_day(value: str | None) -> dt.date | None:
         raise ValidationException(f"Invalid date: {value}") from exc
 
 
+def parse_outcome(value: str | None) -> str | None:
+    """Validate an outcome filter, treating a blank form field as no filter."""
+    if not value:
+        return None
+    if value not in OUTCOME_FILTERS:
+        raise ValidationException(f"Invalid outcome: {value}")
+    return value
+
+
 def midnight(day: dt.date | None, tz: dt.tzinfo, days: int = 0) -> dt.datetime | None:
     if day is None:
         return None
@@ -107,13 +120,18 @@ class PortalController(Controller):
         after: Annotated[dt.datetime | None, QueryParameter()] = None,
         from_param: Annotated[str | None, QueryParameter(name="from")] = None,
         to_param: Annotated[str | None, QueryParameter(name="to")] = None,
+        status_param: Annotated[str | None, QueryParameter(name="status")] = None,
         tz: Annotated[str | None, CookieParameter(name="tz")] = None,
     ) -> Template:
         from_, to = parse_day(from_param), parse_day(to_param)
+        outcome = parse_outcome(status_param)
+        outcomes = OUTCOME_FILTERS[outcome][1] if outcome else None
         tzinfo = zone(tz)
         start, end = midnight(from_, tzinfo), midnight(to, tzinfo, days=1)
         if after:
-            newer = await usage.lookups_after(after, limit=PAGE_SIZE + 1, before=end)
+            newer = await usage.lookups_after(
+                after, limit=PAGE_SIZE + 1, before=end, outcomes=outcomes
+            )
             has_prev, has_next = len(newer) > PAGE_SIZE, True
             items = newer[:PAGE_SIZE][::-1]
         else:
@@ -121,15 +139,20 @@ class PortalController(Controller):
                 limit=PAGE_SIZE + 1,
                 before=before or end,
                 after=start,
+                outcomes=outcomes,
             )
             has_prev, has_next = before is not None, len(older) > PAGE_SIZE
             items = older[:PAGE_SIZE]
         newest, oldest = (items[0].ts, items[-1].ts) if items else (None, None)
-        count = await usage.count(before=end, after=start, newer_than=newest)
-        range_ = {k: v for k, v in (("from", from_), ("to", to)) if v}
+        counts = await usage.count(before=end, after=start, newer_than=newest)
+        totals = {c.outcome: c.total for c in counts}
+        shown = [c for c in counts if outcomes is None or c.outcome in outcomes]
+        offset = sum(c.newer for c in shown)
+        filters = {"from": from_, "to": to, "status": outcome}
+        filters = {k: v for k, v in filters.items() if v}
 
         def page_url(**params: str) -> str:
-            return f"/portal?{urlencode({**range_, **params})}"
+            return f"/portal?{urlencode({**filters, **params})}"
 
         return Template(
             "portal.html",
@@ -139,9 +162,22 @@ class PortalController(Controller):
                 "items": items,
                 "prev_after": newest if has_prev else None,
                 "next_before": oldest if has_next else None,
-                "position": (count.newer + 1, count.newer + len(items), count.total),
+                "position": (
+                    offset + 1,
+                    offset + len(items),
+                    sum(c.total for c in shown),
+                ),
                 "from": from_,
                 "to": to,
+                "outcome": outcome,
+                "outcome_options": [
+                    ("", "All", sum(totals.values())),
+                    *(
+                        (value, label, sum(totals.get(o, 0) for o in of))
+                        for value, (label, of) in OUTCOME_FILTERS.items()
+                    ),
+                ],
+                "filtered": bool(filters),
                 "page_url": page_url,
             },
         )

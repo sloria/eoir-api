@@ -300,6 +300,68 @@ async def test_portal_date_range_uses_client_timezone(client, usage_service):
     assert "Jul 25, 02:00" in (await portal(client, **day)).text
 
 
+async def seed_outcomes(usage_service):
+    await seed(usage_service, dt.timedelta(minutes=1), dt.timedelta(minutes=2))
+    await seed(usage_service, dt.timedelta(minutes=3), outcome="not_found")
+    await seed(usage_service, dt.timedelta(minutes=4), outcome="captcha")
+    await seed(usage_service, dt.timedelta(minutes=5), outcome="quota_exceeded")
+
+
+async def test_portal_filters_by_status(client, usage_service):
+    await seed_outcomes(usage_service)
+    await login(client)
+    page = await portal_page(client, status="not_found")
+    assert page.statuses == ["Not found"]
+    assert "1\N{EN DASH}1 of 1" in page.text
+    assert page.selected == "Not found (1)"
+    assert "All (5)" in page.options
+
+
+async def test_portal_failed_filter_matches_every_failed_outcome(client, usage_service):
+    await seed_outcomes(usage_service)
+    await login(client)
+    page = await portal_page(client, status="failed")
+    assert page.statuses == ["Temporarily unavailable", "Quota exceeded"]
+
+
+async def test_portal_counts_outcomes_in_date_range(client, usage_service):
+    await seed_outcomes(usage_service)
+    await seed(usage_service, dt.timedelta(days=3), outcome="upstream_error")
+    await login(client)
+    page = await portal_page(client, **{"from": "2026-07-25"})
+    assert {"All (5)", "Failed (2)", "Upstream error (0)"} <= set(page.options)
+
+
+async def test_portal_paging_keeps_status_filter(client, usage_service):
+    await seed(usage_service, *(dt.timedelta(minutes=m) for m in range(12)))
+    await seed(usage_service, dt.timedelta(seconds=30), outcome="captcha")
+    await login(client)
+    first = await portal_page(client, status="ok")
+    assert "1\N{EN DASH}10 of 12" in first.text
+
+    rest = Page((await client.get(first.links["Next"])).text)
+    assert "11\N{EN DASH}12 of 12" in rest.text
+
+    back = Page((await client.get(rest.links["Previous"])).text)
+    assert "1\N{EN DASH}10 of 12" in back.text
+    assert set(back.statuses) == {"OK"}
+
+
+async def test_portal_ignores_blank_status_field(client, usage_service):
+    await seed_outcomes(usage_service)
+    await login(client)
+    response = await portal(client, status="")
+    assert response.status_code == 200
+    assert "1\N{EN DASH}5 of 5" in response.text
+
+
+async def test_portal_redirects_on_invalid_status(client):
+    await login(client)
+    response = await portal(client, status="nope")
+    assert response.status_code == 302
+    assert response.headers["location"] == "/portal"
+
+
 ##### Disabled #####
 
 

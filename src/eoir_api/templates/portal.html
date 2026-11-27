@@ -36,17 +36,28 @@
         <label for="to">To</label>
         <input id="to" name="to" type="date" class="field field-sm" value="{{ to or '' }}">
       </div>
+      <div class="cluster stretch">
+        <label for="status">Status</label>
+        <select id="status" name="status" class="field field-sm field-status stretch">
+          {% for value, label, count in outcome_options %}
+            <option value="{{ value }}"{% if value == (outcome or "") %} selected{% endif %}>{{ label }} ({{ count | number }})</option>
+          {% endfor %}
+        </select>
+      </div>
       <button type="submit" class="btn btn-sm stretch">Apply</button>
+      {% if filtered %}<a href="/portal">Clear</a>{% endif %}
     </form>
     <div class="cluster">
-      <p id="tz-note" class="muted push">Times in UTC</p>
+      <p id="tz-note" class="small muted push">Times in UTC</p>
       {% if items %}
         {% set first, last, total = position %}
-        <span class="muted">{{ "{:,}–{:,} of {:,}".format(first, last, total) }}</span>
-        {% if prev_after or next_before %}
-          {{ pager_link("Previous", prev_after and page_url(after=prev_after.isoformat())) }}
-          {{ pager_link("Next", next_before and page_url(before=next_before.isoformat())) }}
-        {% endif %}
+        <div class="cluster muted">
+          <span>{{ "{:,}–{:,} of {:,}".format(first, last, total) }}</span>
+          {% if prev_after or next_before %}
+            {{ pager_link("Previous", prev_after and page_url(after=prev_after.isoformat())) }}
+            {{ pager_link("Next", next_before and page_url(before=next_before.isoformat())) }}
+          {% endif %}
+        </div>
       {% endif %}
     </div>
     <ol class="lookups">
