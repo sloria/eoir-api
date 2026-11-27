@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import inspect
 import json
+from importlib.metadata import version
 
 import httpx2
 import pytest
@@ -98,13 +99,16 @@ async def test_returns_the_case(make_lookup):
     assert result.quota is None
 
 
-async def test_sends_api_key_and_case_details(make_lookup):
+async def test_sends_api_key_user_agent_and_case_details(make_lookup):
     handler = sequence(ok())
 
     await make_lookup(handler)("999999999", "venezuela", refresh=True)
 
     (request,) = handler.requests
     assert request.headers["x-api-key"] == "fake-key"
+    assert request.headers["user-agent"] == (
+        f"eoir-api-client/{version('eoir-api-client')}"
+    )
     assert (request.method, str(request.url)) == (
         "POST",
         "http://eoir.test/cases/lookup",
