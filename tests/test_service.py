@@ -133,6 +133,8 @@ async def test_queue_guard_rejects_when_wait_is_too_long(usage, service, browser
     with pytest.raises(QueueTimeoutError):
         await service.get_case(A_NUMBER, VE, usage=usage)
     assert browser.calls == []
+    [row] = await lookup_rows(usage.service)
+    assert row.outcome == "queue_full"
 
 
 async def test_queue_guard_allows_a_short_queue(usage, service):

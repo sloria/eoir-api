@@ -234,6 +234,7 @@ class CaseService:
             return
         retry_after = quota.reset_in()
         logger.info("lookup.quota_exceeded", retry_after=retry_after)
+        await usage.record(outcome="quota_exceeded", cached=False)
         raise QuotaExceededError("Daily quota exceeded", retry_after=retry_after)
 
     async def get_case(
@@ -272,6 +273,7 @@ class CaseService:
             max_concurrency is not None
             and self._tenant_pending[tenant.name] >= max_concurrency
         ):
+            await usage.record(outcome="concurrency_limited", cached=False)
             raise QueueTimeoutError(
                 f"Tenant max_concurrency of {max_concurrency} reached",
                 max_concurrency=max_concurrency,
@@ -281,6 +283,7 @@ class CaseService:
             raise self._unavailable()
         wait = self.estimated_wait
         if wait > self.settings.lookup.max_queue_wait:
+            await usage.record(outcome="queue_full", cached=False)
             raise QueueTimeoutError(
                 f"Estimated wait {wait:.0f}s exceeds "
                 f"{self.settings.lookup.max_queue_wait}s; retry shortly"

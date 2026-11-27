@@ -325,7 +325,7 @@ async def test_tenant_at_max_concurrency_gets_429_while_another_tenant_is_admitt
     assert event["max_concurrency"] == 1
 
 
-async def test_max_concurrency_hit_does_not_record_a_lookup_or_consume_quota(
+async def test_max_concurrency_hit_is_recorded_without_consuming_quota(
     client, browser, service, settings, usage_service
 ):
     settings.tenants[1].max_concurrency = 1
@@ -336,4 +336,5 @@ async def test_max_concurrency_hit_does_not_record_a_lookup_or_consume_quota(
     assert rejected.status_code == 429
     assert rejected.headers["X-RateLimit-Remaining"] == "5"
     assert browser.calls == []
-    assert await lookup_rows(usage_service) == []
+    rows = await lookup_rows(usage_service)
+    assert [r.outcome for r in rows] == ["concurrency_limited"]

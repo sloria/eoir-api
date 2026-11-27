@@ -23,9 +23,18 @@ LookupOutcome = Literal[
     "unavailable",
     "captcha",
     "upstream_error",
+    "quota_exceeded",
+    "concurrency_limited",
+    "queue_full",
 ]
 
-UNCOUNTED: set[LookupOutcome] = {"captcha", "upstream_error"}
+UNCOUNTED: set[LookupOutcome] = {
+    "captcha",
+    "upstream_error",
+    "quota_exceeded",
+    "concurrency_limited",
+    "queue_full",
+}
 
 queries = SQLFileLoader()
 queries.load_sql(Path(__file__).parent / "sql" / "usage.sql")
