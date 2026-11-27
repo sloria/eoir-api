@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/sloria/eoir-api/compare/acis-core-v1.5.0...acis-core-v1.6.0) (2026-11-27)
+
+
+### Features
+
+* **acis-core:** decode court, asylum clock, case dates and more hearing, decision and appeal fields ([#140](https://github.com/sloria/eoir-api/issues/140)) ([6af2980](https://github.com/sloria/eoir-api/commit/6af2980d38b1fc33360c7e679439f634323e3611))
+
 ## [1.6.0](https://github.com/sloria/eoir-api/compare/acis-core-v1.5.0...acis-core-v1.6.0) (2026-11-26)
 
 
