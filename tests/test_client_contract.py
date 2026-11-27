@@ -68,8 +68,10 @@ async def test_bad_api_key(make_client):
 async def test_case_not_found(make_client, browser):
     browser.payload = None
 
-    with pytest.raises(CaseNotFoundError):
+    with pytest.raises(CaseNotFoundError) as excinfo:
         await make_client().lookup(A_NUMBER, "VE")
+
+    assert excinfo.value.code == "case_not_found"
 
 
 async def test_case_unavailable(make_client, browser):
