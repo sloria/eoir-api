@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Annotated, Any, Literal, cast
+from typing import Annotated, Any
 
 import msgspec
 import structlog
@@ -15,7 +15,7 @@ from acis_browser import (
 )
 from acis_core.a_numbers import InvalidANumberError, normalize_a_number
 from acis_core.nationalities import UnknownNationalityError, resolve
-from litestar import Request, Response, get, post
+from litestar import Response, get, post
 from litestar.di import NamedDependency
 from litestar.exceptions import (
     ClientException,
@@ -70,8 +70,12 @@ class CaseLookup(msgspec.Struct, forbid_unknown_fields=True):
 
 
 class ErrorResponse(msgspec.Struct):
-    status_code: int
+    """An RFC 9457 problem."""
+
+    status: int
+    title: str
     detail: str
+    code: str | None = None
 
 
 class BadRequest(ErrorResponse):
@@ -81,25 +85,13 @@ class BadRequest(ErrorResponse):
     ] = None
 
 
-class TooManyRequests(ErrorResponse):
-    code: Annotated[
-        Literal["quota_exceeded"] | None,
-        msgspec.Meta(description="Set when the daily quota is used up."),
-    ] = None
-
-
-def flatten_extra(_: Request, exc: TooManyRequestsException) -> Response:
-    """Build an error response with `extra` moved to the top level."""
-    extra = cast("dict[str, Any]", exc.extra or {})
-    return Response(
-        {"status_code": exc.status_code, "detail": exc.detail, **extra},
-        status_code=exc.status_code,
-        headers=exc.headers,
-    )
-
-
 def error_spec(model: type[ErrorResponse], description: str) -> ResponseSpec:
-    return ResponseSpec(model, description=description, generate_examples=False)
+    return ResponseSpec(
+        model,
+        description=description,
+        generate_examples=False,
+        media_type="application/problem+json",
+    )
 
 
 ERROR_RESPONSES = {
@@ -107,12 +99,17 @@ ERROR_RESPONSES = {
         BadRequest, "Invalid A-Number, unknown nationality, or malformed body"
     ),
     401: error_spec(ErrorResponse, "Invalid or missing `x-api-key` header"),
-    404: error_spec(ErrorResponse, "No case found for that A-Number and nationality"),
+    404: error_spec(
+        ErrorResponse,
+        "No case for that A-Number (`case_not_found`), or none with that "
+        "nationality (`nationality_mismatch`)",
+    ),
     422: error_spec(
         ErrorResponse, "The case exists but ACIS won't release information for it"
     ),
     429: error_spec(
-        TooManyRequests, "Too many pending lookups or daily quota exceeded"
+        ErrorResponse,
+        "Too many pending lookups, or daily quota exceeded (`quota_exceeded`)",
     ),
     502: error_spec(ErrorResponse, "ACIS returned an unexpected response"),
     503: error_spec(
@@ -163,7 +160,6 @@ def health() -> Response:
     responses=ERROR_RESPONSES,
     summary="Look up a case",
     response_description="The case, with the raw ACIS payload",
-    exception_handlers={TooManyRequestsException: flatten_extra},
 )
 async def lookup_case(
     *,
@@ -202,11 +198,14 @@ async def fetch_case(
         )
     except CaseNotFoundError as exc:
         logger.info("case.not_found")
-        raise NotFoundException("No case found for that A-Number.") from exc
+        raise NotFoundException(
+            "No case found for that A-Number.", extra={"code": "case_not_found"}
+        ) from exc
     except InvalidNationalityError as exc:
         logger.info("case.invalid_nationality")
         raise NotFoundException(
-            "No case found for that A-Number with that nationality code."
+            "No case found for that A-Number with that nationality code.",
+            extra={"code": "nationality_mismatch"},
         ) from exc
     except CaseUnavailableError as exc:
         logger.info("case.unavailable")
