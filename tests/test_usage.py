@@ -39,7 +39,21 @@ async def test_lookup_at_quota_returns_429_until_oldest_ages_out(
     assert response.headers["X-RateLimit-Remaining"] == "0"
     assert response.headers["X-RateLimit-Reset"] == epoch(NOW + dt.timedelta(hours=1))
     assert browser.calls == []
-    assert len(await lookup_rows(usage_service)) == 5
+    assert (await lookup_rows(usage_service))[-1].outcome == "quota_exceeded"
+
+
+async def test_rejected_lookups_do_not_delay_quota_reset(
+    client, usage_service, time_machine
+):
+    await seed(usage_service, *(dt.timedelta(hours=h) for h in (23, 10, 5, 2, 1)))
+    for _ in range(3):
+        assert (await lookup(client)).status_code == 429
+    response = await lookup(client)
+    assert response.headers["X-RateLimit-Reset"] == epoch(NOW + dt.timedelta(hours=1))
+    time_machine.move_to(NOW + dt.timedelta(hours=1, seconds=1), tick=False)
+    response = await lookup(client)
+    assert response.status_code == 200
+    assert response.headers["X-RateLimit-Remaining"] == "0"
 
 
 async def test_rows_older_than_24h_do_not_count(client, usage_service):

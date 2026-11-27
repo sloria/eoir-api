@@ -224,6 +224,15 @@ async def test_portal_shows_request_id_of_each_lookup(client, usage_service):
     ]
 
 
+async def test_portal_lists_rejected_lookups(client, usage_service):
+    await seed(usage_service, *[dt.timedelta(hours=1)] * 5)
+    assert (await lookup(client)).status_code == 429
+    await login(client)
+    page = await portal_page(client)
+    assert page.statuses[0] == "Quota exceeded"
+    assert "0 left" in page.text
+
+
 async def test_portal_lookups_are_tenant_scoped(client, usage_service):
     await seed(usage_service, dt.timedelta(hours=1), tenant="owner", outcome="captcha")
     await login(client)

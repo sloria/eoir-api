@@ -18,9 +18,9 @@ from litestar.status_codes import HTTP_303_SEE_OTHER, HTTP_401_UNAUTHORIZED
 
 from eoir_api.auth import SESSION_MAX_AGE, resolve_tenant
 from eoir_api.settings import Tenant
-from eoir_api.usage import LookupOutcome, TenantUsage
+from eoir_api.usage import UNCOUNTED, LookupOutcome, TenantUsage
 
-FAILED: set[LookupOutcome] = {"unavailable", "captcha", "upstream_error"}
+FAILED: set[LookupOutcome] = UNCOUNTED | {"unavailable"}
 LABELS: dict[LookupOutcome, str] = {
     "ok": "OK",
     "not_found": "Not found",
@@ -28,6 +28,9 @@ LABELS: dict[LookupOutcome, str] = {
     "unavailable": "Case unavailable",
     "captcha": "Temporarily unavailable",
     "upstream_error": "Upstream error",
+    "quota_exceeded": "Quota exceeded",
+    "concurrency_limited": "Too many concurrent lookups",
+    "queue_full": "Too many pending lookups",
 }
 PAGE_SIZE = 10
 
