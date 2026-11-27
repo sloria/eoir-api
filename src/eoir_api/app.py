@@ -349,7 +349,9 @@ def build_app(
         return settings.tenants
 
     async def provide_usage(request: Request[Tenant, Any, State]) -> TenantUsage:
-        return TenantUsage(usage_service, request.user)
+        return TenantUsage(
+            usage_service, request.user, request_id=request.state.get("request_id")
+        )
 
     route_handlers: list[Any] = [
         *ROUTE_HANDLERS,

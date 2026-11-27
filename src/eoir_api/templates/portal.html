@@ -50,6 +50,7 @@
         <li class="lookup">
           <span{% if item.outcome is failed %} class="err"{% endif %}>{{ item.outcome | outcome_label }}</span>
           {{ timestamp(item.ts, "small muted") }}
+          {% if item.request_id %}<code class="lookup-id muted">{{ item.request_id }}</code>{% endif %}
           {% if item.cached %}
             <span class="lookup-dur small muted">from cache</span>
           {% else %}
