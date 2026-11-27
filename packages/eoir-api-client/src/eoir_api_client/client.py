@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib.metadata import version
 from typing import TYPE_CHECKING, Self
 
 import httpx2
@@ -11,12 +12,13 @@ if TYPE_CHECKING:
     from eoir_api_client.models import LookupResult
 
 DEFAULT_TIMEOUT = 120.0
+USER_AGENT = f"eoir-api-client/{version('eoir-api-client')}"
 
 
 class _BaseClient:
     def __init__(self, base_url: str, api_key: str) -> None:
         self._base_url = base_url.rstrip("/")
-        self._headers = {"x-api-key": api_key}
+        self._headers = {"x-api-key": api_key, "user-agent": USER_AGENT}
 
     def _url(self, path: str) -> str:
         return self._base_url + path
