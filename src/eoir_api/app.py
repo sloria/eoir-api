@@ -95,10 +95,8 @@ def make_browser_lifespan(
         try:
             async with anyio.create_task_group() as tg:
                 tg.start_soon(reap_idle_browsers)
-                try:
-                    yield
-                finally:
-                    tg.cancel_scope.cancel()
+                yield
+                tg.cancel_scope.cancel()
         finally:
             async with anyio.create_task_group() as tg:
                 for name, browser in browsers.items():

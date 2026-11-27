@@ -31,7 +31,7 @@ def resolve_tenant(tenants: Iterable[Tenant], key: str) -> Tenant | None:
 
 
 class TenantAuthMiddleware(ASGIMiddleware):
-    """Authenticate the tenant for ``x-api-key``, setting``request.user``."""
+    """Authenticate the tenant for ``x-api-key``, setting ``request.user``."""
 
     exclude_opt_key = "exclude_from_auth"
     should_bypass_for_scope = staticmethod(
