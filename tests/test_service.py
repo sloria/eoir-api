@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 
 import anyio
@@ -13,7 +14,7 @@ from eoir_api.service import CaseService
 from eoir_api.settings import Browser, Proxy, Secret, Tenant
 from eoir_api.usage import TenantUsage
 
-from .conftest import FakeACISBrowser
+from .conftest import FakeACISBrowser, lookup_rows
 
 pytestmark = pytest.mark.anyio
 
@@ -89,6 +90,36 @@ async def test_failures_are_not_cached(usage, service, browser):
     result = await service.get_case(A_NUMBER, VE, usage=usage)
     assert result.cached is False
     assert len(browser.calls) == 2
+
+
+async def test_lookup_is_cached_even_if_recording_fails(
+    usage, service, browser, monkeypatch
+):
+    async def fail(**kwargs):
+        raise RuntimeError("db down")
+
+    with monkeypatch.context() as m:
+        m.setattr(usage.service, "record", fail)
+        with pytest.raises(RuntimeError):
+            await service.get_case(A_NUMBER, VE, usage=usage)
+
+    result = await service.get_case(A_NUMBER, VE, usage=usage)
+    assert result.cached is True
+    assert len(browser.calls) == 1
+
+
+async def test_cancelled_lookup_is_not_recorded_as_ok(
+    usage, service, browser, usage_service
+):
+    started, _ = hold_lookups(browser)
+    task = asyncio.ensure_future(service.get_case(A_NUMBER, VE, usage=usage))
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    [row] = await lookup_rows(usage_service)
+    assert row.outcome == "upstream_error"
 
 
 ##### Queue guard #####
