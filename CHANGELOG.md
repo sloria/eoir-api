@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.1.0](https://github.com/sloria/eoir-api/compare/eoir-api-v2.0.0...eoir-api-v2.1.0) (2026-11-27)
+
+
+### Features
+
+* **portal:** filter lookups by status ([9cae9d2](https://github.com/sloria/eoir-api/commit/9cae9d23f5513e3e28d9a3bb22a60690339be681))
+* **portal:** record lookups rejected during captcha cooldown ([e870b10](https://github.com/sloria/eoir-api/commit/e870b109f433be90f101204a2285bd726a87bfed))
+* **portal:** record rejected lookups ([ae44293](https://github.com/sloria/eoir-api/commit/ae442932f3a925ec0b73ba82f11cb04963ce6566))
+* **portal:** show request id on lookups ([80c4989](https://github.com/sloria/eoir-api/commit/80c49890bc65847cbba4d3dd949fc1d2fb3add43))
+
+
+### Bug Fixes
+
+* **portal:** trim timestamp tooltip to seconds ([0949c45](https://github.com/sloria/eoir-api/commit/0949c45ae86bc1fd0316487fd58ae76ade6ef2b2))
+* **portal:** wrap date filter labels with their inputs ([c103b1b](https://github.com/sloria/eoir-api/commit/c103b1bb44d3fa8d2b359885099f3e197c99a75c))
+
 ## [2.0.0](https://github.com/sloria/eoir-api/compare/eoir-api-v1.3.0...eoir-api-v2.0.0) (2026-11-27)
 
 
