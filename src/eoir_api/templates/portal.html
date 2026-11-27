@@ -28,10 +28,14 @@
 
   <section id="lookups" class="flow" aria-label="Lookups">
     <form class="cluster" method="get" action="/portal">
-      <label for="from">From</label>
-      <input id="from" name="from" type="date" class="field field-sm" value="{{ from or '' }}">
-      <label for="to">To</label>
-      <input id="to" name="to" type="date" class="field field-sm" value="{{ to or '' }}">
+      <div class="cluster">
+        <label for="from">From</label>
+        <input id="from" name="from" type="date" class="field field-sm" value="{{ from or '' }}">
+      </div>
+      <div class="cluster">
+        <label for="to">To</label>
+        <input id="to" name="to" type="date" class="field field-sm" value="{{ to or '' }}">
+      </div>
       <button type="submit" class="btn btn-sm stretch">Apply</button>
     </form>
     <div class="cluster">
